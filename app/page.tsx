@@ -93,6 +93,11 @@ const SAFETY_CONFIG: Record<Safety, { label: string; color: string; bg: string; 
   rug:  { label: 'RUG RISK', color: '#ff3b6b', bg: 'rgba(255,59,107,0.10)', border: 'rgba(255,59,107,0.40)', glow: 'rgba(255,59,107,0.13)' },
 };
 
+function formatChange(pct: number): string {
+  const fixed = Math.abs(pct).toFixed(2);
+  return (pct >= 0 ? '+' : '-') + fixed + '%';
+}
+
 function formatPrice(price: number): string {
   if (price < 0.000001) return price.toExponential(2);
   if (price < 0.001) return price.toFixed(7);
@@ -211,7 +216,7 @@ function TokenCard({
   onToggleStar: () => void;
 }) {
   const changePos = token.change24h >= 0;
-  const cfg = SAFETY_CONFIG[token.safety];
+  const cfg       = SAFETY_CONFIG[token.safety];
   return (
     <div
       className="token-card"
@@ -261,7 +266,7 @@ function TokenCard({
           fontSize: 12, fontWeight: 700,
           color: changePos ? '#00ff9d' : '#ff3b6b',
         }}>
-          {changePos ? '+' : ''}{token.change24h}%
+          {formatChange(token.change24h)}
         </span>
       </div>
 
@@ -542,7 +547,7 @@ function WhaleCard({ tx }: { tx: WhaleTx }) {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('trending');
-  const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [watchedTokens, setWatchedTokens] = useState<DisplayToken[]>([]);
   const [search, setSearch] = useState('');
   const [safetyFilter, setSafetyFilter] = useState<SafetyFilter>('all');
   const [sortField, setSortField] = useState<SortField>('safetyScore');
@@ -567,6 +572,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [apiCallCount, setApiCallCount] = useState(0);
   const apiCallRef = useRef(0);
+  const hasFetchedRef = useRef(false);
 
   function bumpApiCount(n = 1) {
     apiCallRef.current += n;
@@ -797,14 +803,27 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('watchlist');
-      if (stored) setWatchlist(JSON.parse(stored));
-    } catch {}
+    // Load watchlist (full token objects) from localStorage
+    const loadWatchlist = () => {
+      try {
+        const stored = localStorage.getItem('birdeye-watchlist');
+        if (stored) setWatchedTokens(JSON.parse(stored));
+      } catch {}
+    };
+    loadWatchlist();
+
+    // Sync watchlist when another tab/window changes it
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'birdeye-watchlist') loadWatchlist();
+    };
+    window.addEventListener('storage', onStorage);
+
     const now = new Date();
-    const hh = now.getHours().toString().padStart(2, '0');
-    const mm = now.getMinutes().toString().padStart(2, '0');
-    setUpdateTime(`${hh}:${mm}`);
+    setUpdateTime(`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`);
+
+    // Guard against React StrictMode double-invoke
+    if (hasFetchedRef.current) return () => window.removeEventListener('storage', onStorage);
+    hasFetchedRef.current = true;
 
     fetchAllData();
     fetchWhales();
@@ -812,7 +831,10 @@ export default function Home() {
     fetchMemes();
     fetchSmartMoney();
     fetchDefiPulse();
-  }, [fetchAllData, fetchWhales, fetchLivefeed, fetchMemes, fetchSmartMoney, fetchDefiPulse]);
+
+    return () => window.removeEventListener('storage', onStorage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const id = setInterval(fetchAllData, 60_000);
@@ -850,15 +872,22 @@ export default function Home() {
     setSafetyFilter('all');
   }, [activeTab]);
 
-  function toggleWatchlist(address: string) {
-    setWatchlist(prev => {
-      const next = prev.includes(address)
-        ? prev.filter(a => a !== address)
-        : [...prev, address];
-      try { localStorage.setItem('watchlist', JSON.stringify(next)); } catch {}
+  function toggleWatchlist(token: DisplayToken) {
+    setWatchedTokens(prev => {
+      const isWatched = prev.some(t => t.address === token.address);
+      const next = isWatched
+        ? prev.filter(t => t.address !== token.address)
+        : [...prev, token];
+      try { localStorage.setItem('birdeye-watchlist', JSON.stringify(next)); } catch {}
       return next;
     });
   }
+
+  // Starred addresses set — used for O(1) "is this token starred?" checks
+  const watchlistAddresses = useMemo(
+    () => new Set(watchedTokens.map(t => t.address)),
+    [watchedTokens],
+  );
 
   const allKnown = useMemo(() => {
     const map = new Map<string, DisplayToken>();
@@ -866,24 +895,29 @@ export default function Home() {
     return Array.from(map.values());
   }, [listingTokens, trendingTokens]);
 
-  const watchlistTokens = useMemo(
-    () => allKnown.filter(t => watchlist.includes(t.address)),
-    [allKnown, watchlist]
-  );
-
   const baseTokens: DisplayToken[] = useMemo(() => {
     if (activeTab === 'listings')    return listingTokens;
     if (activeTab === 'trending')    return trendingTokens;
     if (activeTab === 'mememonitor') return memeTokens;
     if (activeTab === 'smartmoney')  return smartMoneyTokens;
     if (activeTab === 'defipulse')   return defiPulseTokens;
-    if (activeTab === 'watchlist')   return watchlistTokens;
+    if (activeTab === 'watchlist')   return watchedTokens;
     return [];
-  }, [activeTab, listingTokens, trendingTokens, memeTokens, smartMoneyTokens, defiPulseTokens, watchlistTokens]);
+  }, [activeTab, listingTokens, trendingTokens, memeTokens, smartMoneyTokens, defiPulseTokens, watchedTokens]);
 
   const safeCount    = useMemo(() => baseTokens.filter(t => t.safety === 'safe').length, [baseTokens]);
   const cautionCount = useMemo(() => baseTokens.filter(t => t.safety === 'warn').length, [baseTokens]);
   const riskyCount   = useMemo(() => baseTokens.filter(t => t.safety === 'rug').length,  [baseTokens]);
+
+  // Global counts across every loaded token list — for the header legend
+  const globalSafety = useMemo(() => {
+    const all = [...trendingTokens, ...listingTokens, ...memeTokens, ...smartMoneyTokens, ...defiPulseTokens];
+    return {
+      safe:    all.filter(t => t.safety === 'safe').length,
+      caution: all.filter(t => t.safety === 'warn').length,
+      risky:   all.filter(t => t.safety === 'rug').length,
+    };
+  }, [trendingTokens, listingTokens, memeTokens, smartMoneyTokens, defiPulseTokens]);
 
   const filteredTokens = useMemo(() => {
     return baseTokens
@@ -1106,13 +1140,13 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Row 2: safety legend */}
+            {/* Row 2: safety legend — live counts across all loaded tokens */}
             <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
               {[
-                { dot: '#00ff9d', glow: '#00ff9d', label: 'Safe (70-100)' },
-                { dot: '#f5a623', glow: '#f5a623', label: 'Caution (40-69)' },
-                { dot: '#ff3b6b', glow: '#ff3b6b', label: 'Risky (0-39)' },
-              ].map(({ dot, glow, label }) => (
+                { dot: '#00ff9d', glow: '#00ff9d', label: 'Safe',    count: globalSafety.safe    },
+                { dot: '#f5a623', glow: '#f5a623', label: 'Caution', count: globalSafety.caution },
+                { dot: '#ff3b6b', glow: '#ff3b6b', label: 'Risky',   count: globalSafety.risky   },
+              ].map(({ dot, glow, label, count }) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{
                     width: 8, height: 8, borderRadius: '50%',
@@ -1120,7 +1154,7 @@ export default function Home() {
                     display: 'inline-block',
                     boxShadow: `0 0 8px ${glow}`,
                   }} />
-                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{label}</span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{label} ({count})</span>
                 </div>
               ))}
             </div>
@@ -1163,13 +1197,13 @@ export default function Home() {
                         {tab.label}
                       </span>
                     ) : tab.label}
-                    {tab.id === 'watchlist' && watchlist.length > 0 && (
+                    {tab.id === 'watchlist' && watchedTokens.length > 0 && (
                       <span style={{
                         marginLeft: 6, fontSize: 10, fontWeight: 700,
                         background: 'rgba(99,102,241,0.35)',
                         color: '#a5b4fc', padding: '1px 5px', borderRadius: 10,
                       }}>
-                        {watchlist.length}
+                        {watchedTokens.length}
                       </span>
                     )}
                   </button>
@@ -1197,7 +1231,7 @@ export default function Home() {
                       Live Feed
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                      Real-time swaps — SOL · JUP · BONK — refreshes every 15s
+                      Real-time swaps — BONK · WIF · POPCAT · JUP · SOL — refreshes every 15s
                     </div>
                   </div>
                 </div>
@@ -1382,8 +1416,8 @@ export default function Home() {
                       <TokenCard
                         key={token.address}
                         token={token}
-                        starred={watchlist.includes(token.address)}
-                        onToggleStar={() => toggleWatchlist(token.address)}
+                        starred={watchlistAddresses.has(token.address)}
+                        onToggleStar={() => toggleWatchlist(token)}
                       />
                     ))}
                   </div>
@@ -1697,8 +1731,8 @@ export default function Home() {
                     <TokenCard
                       key={token.address}
                       token={token}
-                      starred={watchlist.includes(token.address)}
-                      onToggleStar={() => toggleWatchlist(token.address)}
+                      starred={watchlistAddresses.has(token.address)}
+                      onToggleStar={() => toggleWatchlist(token)}
                     />
                   ))}
                 </div>

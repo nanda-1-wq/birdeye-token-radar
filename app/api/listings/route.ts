@@ -6,7 +6,7 @@ export async function GET() {
   const apiKey = process.env.NEXT_PUBLIC_BIRDEYE_API_KEY ?? '';
   const params = new URLSearchParams({
     sort_by: 'mc',
-    sort_type: 'asc',
+    sort_type: 'desc',
     offset: '0',
     limit: '20',
     min_liquidity: '10000',

@@ -4,9 +4,11 @@ const BASE_URL = 'https://public-api.birdeye.so';
 const SOL_ADDR = 'So11111111111111111111111111111111111111112';
 
 const HOT_TOKENS = [
-  { address: SOL_ADDR,                                                   symbol: 'SOL'  },
-  { address: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',             symbol: 'JUP'  },
-  { address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',            symbol: 'BONK' },
+  { address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',            symbol: 'BONK'   },
+  { address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',            symbol: 'WIF'    },
+  { address: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr',            symbol: 'POPCAT' },
+  { address: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',             symbol: 'JUP'    },
+  { address: SOL_ADDR,                                                   symbol: 'SOL'    },
 ];
 
 function headers(apiKey: string): HeadersInit {
@@ -27,7 +29,7 @@ export async function GET() {
         tx_type: 'swap',
         sort_type: 'desc',
         offset: '0',
-        limit: '15',
+        limit: '10',
       });
       const res = await fetch(`${BASE_URL}/defi/txs/token?${params}`, {
         headers: headers(apiKey),
@@ -80,15 +82,21 @@ export async function GET() {
               : toSymbol || 'SOL';
         }
 
-        // Amount: tokenPrice × base(from).uiAmount; fallback quote(to).uiAmount × quote.price
+        // Amount: try multiple price sources, take the max of all non-zero values
         const tokenPrice   = Number(item.tokenPrice ?? 0);
         const baseUiAmount = Number(fromObj.uiAmount ?? fromObj.amount ?? 0);
-        const quoteUiAmt   = Number(toObj.uiAmount   ?? toObj.amount   ?? 0);
-        const quotePrice   = Number(toObj.price ?? 0);
-        const amountUsd =
-          tokenPrice > 0 && baseUiAmount > 0
-            ? tokenPrice * baseUiAmount
-            : quoteUiAmt * quotePrice;
+        const fromPrice    = Number(fromObj.price ?? 0);
+        const quoteUiAmt   = Number(toObj.uiAmount ?? toObj.amount ?? 0);
+        const toPrice      = Number(toObj.price ?? 0);
+        const toNearLiq    = Number(toObj.nearLiquidityPrice ?? 0);
+
+        const candidates = [
+          tokenPrice   > 0 && baseUiAmount > 0 ? tokenPrice * baseUiAmount   : 0,
+          toNearLiq    > 0 && quoteUiAmt    > 0 ? toNearLiq * quoteUiAmt      : 0,
+          fromPrice    > 0 && baseUiAmount  > 0 ? fromPrice * baseUiAmount    : 0,
+          toPrice      > 0 && quoteUiAmt    > 0 ? toPrice   * quoteUiAmt      : 0,
+        ];
+        const amountUsd = Math.max(...candidates);
 
         const walletAddress = String(
           (item.owner as string) ??
@@ -119,6 +127,7 @@ export async function GET() {
   }
 
   const sorted = all
+    .filter(a => Number(a.amountUsd) >= 1)
     .sort((a, b) => Number(b.blockUnixTime) - Number(a.blockUnixTime))
     .slice(0, 30);
 

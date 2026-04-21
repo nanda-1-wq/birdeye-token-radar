@@ -16,32 +16,32 @@ export async function GET(request: Request) {
   if (!addresses) return NextResponse.json({ data: {} });
 
   const apiKey = process.env.NEXT_PUBLIC_BIRDEYE_API_KEY ?? '';
+  const addrList = addresses.split(',').map(a => a.trim()).filter(Boolean);
 
-  try {
-    const res = await fetch(`${BASE_URL}/defi/multi_price?list_address=${encodeURIComponent(addresses)}`, {
-      headers: headers(apiKey),
-      next: { revalidate: 15 },
-    });
-    if (!res.ok) return NextResponse.json({ data: {} });
-    const json = await res.json();
-    console.log('[token-info] raw multi_price response:', JSON.stringify(json).slice(0, 500));
-
-    // Normalize to { ADDRESS: { price, change24h } } regardless of Birdeye field names
-    const raw: Record<string, Record<string, unknown>> = json?.data ?? {};
-    const normalized: Record<string, { price: number; change24h: number }> = {};
-    for (const [addr, entry] of Object.entries(raw)) {
-      normalized[addr] = {
-        price:    Number(entry.value ?? entry.price ?? 0),
-        change24h: Number(
-          entry.priceChange24hPercent ??
-          entry.priceChange24h ??
-          entry.change24h ??
-          0,
-        ),
+  const results = await Promise.allSettled(
+    addrList.map(async (address) => {
+      const res = await fetch(`${BASE_URL}/defi/price?address=${address}`, {
+        headers: headers(apiKey),
+        next: { revalidate: 15 },
+      });
+      if (!res.ok) return { address, price: 0, change24h: 0 };
+      const json = await res.json();
+      const entry = json?.data ?? {};
+      return {
+        address,
+        price:     Number(entry.value ?? entry.price ?? 0),
+        change24h: Number(entry.priceChange24hPercent ?? entry.priceChange24h ?? 0),
       };
+    }),
+  );
+
+  const normalized: Record<string, { price: number; change24h: number }> = {};
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      const { address, price, change24h } = result.value;
+      normalized[address] = { price, change24h };
     }
-    return NextResponse.json({ data: normalized });
-  } catch {
-    return NextResponse.json({ data: {} });
   }
+
+  return NextResponse.json({ data: normalized });
 }
