@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
-type Tab = 'listings' | 'trending' | 'whales' | 'watchlist';
+type Tab = 'trending' | 'listings' | 'whales' | 'watchlist';
 type Safety = 'safe' | 'warn' | 'rug';
+type SafetyFilter = 'all' | 'safe' | 'caution' | 'risky';
+type SortField = 'safetyScore' | 'mcap' | 'volume24h';
 
-interface Token {
+interface DisplayToken {
   symbol: string;
   name: string;
   address: string;
@@ -13,29 +15,41 @@ interface Token {
   change24h: number;
   mcap: number;
   safety: Safety;
+  safetyScore: number;
   holders: number;
   age: string;
+  volume24h: number;
+  liquidity?: number;
+  rank?: number;
 }
 
-const MOCK_TOKENS: Token[] = [
-  { symbol: 'BONKAI', name: 'Bonkai', address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsk', price: 0.000042, change24h: 340, mcap: 420000, safety: 'safe', holders: 1240, age: '2h ago' },
-  { symbol: 'PEPE2', name: 'PepeSol', address: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', price: 0.0000091, change24h: 88, mcap: 180000, safety: 'warn', holders: 430, age: '5h ago' },
-  { symbol: 'RUGBAIT', name: 'RugBait', address: 'So11111111111111111111111111111111111111112', price: 0.0000001, change24h: 2100, mcap: 9000, safety: 'rug', holders: 12, age: '1h ago' },
-  { symbol: 'WIFM', name: 'WifMoon', address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', price: 0.00089, change24h: 55, mcap: 890000, safety: 'safe', holders: 3200, age: '8h ago' },
-  { symbol: 'MGDOG', name: 'MegaDog', address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', price: 0.00012, change24h: -12, mcap: 120000, safety: 'warn', holders: 680, age: '12h ago' },
+const MOCK_LISTINGS: DisplayToken[] = [
+  { symbol: 'BONKAI', name: 'Bonkai', address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsk', price: 0.000042, change24h: 340, mcap: 420000, safety: 'safe', safetyScore: 87, holders: 1240, age: '2h ago', volume24h: 2400000, liquidity: 85000 },
+  { symbol: 'PEPE2', name: 'PepeSol', address: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', price: 0.0000091, change24h: 88, mcap: 180000, safety: 'warn', safetyScore: 45, holders: 430, age: '5h ago', volume24h: 320000, liquidity: 42000 },
+  { symbol: 'RUGBAIT', name: 'RugBait', address: 'So11111111111111111111111111111111111111112', price: 0.0000001, change24h: 2100, mcap: 9000, safety: 'rug', safetyScore: 8, holders: 12, age: '1h ago', volume24h: 18000 },
+  { symbol: 'WIFM', name: 'WifMoon', address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', price: 0.00089, change24h: 55, mcap: 890000, safety: 'safe', safetyScore: 82, holders: 3200, age: '8h ago', volume24h: 1100000, liquidity: 220000 },
+  { symbol: 'MGDOG', name: 'MegaDog', address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', price: 0.00012, change24h: -12, mcap: 120000, safety: 'warn', safetyScore: 51, holders: 680, age: '12h ago', volume24h: 85000, liquidity: 28000 },
+];
+
+const MOCK_TRENDING: DisplayToken[] = [
+  { symbol: 'BONKAI', name: 'Bonkai', address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsk', price: 0.000042, change24h: 340, mcap: 420000, safety: 'safe', safetyScore: 87, holders: 1240, age: '', volume24h: 2400000, liquidity: 85000, rank: 1 },
+  { symbol: 'WIFM', name: 'WifMoon', address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', price: 0.00089, change24h: 55, mcap: 890000, safety: 'safe', safetyScore: 82, holders: 3200, age: '', volume24h: 1100000, liquidity: 220000, rank: 2 },
+  { symbol: 'SPELPE', name: 'SolPepe', address: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', price: 0.000034, change24h: 180, mcap: 340000, safety: 'warn', safetyScore: 61, holders: 890, age: '', volume24h: 880000, liquidity: 65000, rank: 3 },
+  { symbol: 'CIAD', name: 'CatInADog', address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', price: 0.00055, change24h: 42, mcap: 550000, safety: 'warn', safetyScore: 55, holders: 1100, age: '', volume24h: 550000, liquidity: 95000, rank: 4 },
+  { symbol: 'MEMEX', name: 'MemeX', address: 'MemeX1111111111111111111111111111111111111', price: 0.0021, change24h: 28, mcap: 2100000, safety: 'safe', safetyScore: 70, holders: 4500, age: '', volume24h: 320000, liquidity: 180000, rank: 5 },
 ];
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'listings', label: 'New Listings' },
   { id: 'trending', label: 'Trending' },
+  { id: 'listings', label: 'New Listings' },
   { id: 'whales', label: 'Whales' },
   { id: 'watchlist', label: 'Watchlist' },
 ];
 
 const SAFETY_CONFIG: Record<Safety, { label: string; color: string; bg: string; border: string }> = {
-  safe: { label: 'SAFE', color: '#00ff9d', bg: 'rgba(0,255,157,0.08)', border: 'rgba(0,255,157,0.25)' },
-  warn: { label: 'CAUTION', color: '#f5c518', bg: 'rgba(245,197,24,0.08)', border: 'rgba(245,197,24,0.25)' },
-  rug: { label: 'RUG RISK', color: '#ff3b6b', bg: 'rgba(255,59,107,0.08)', border: 'rgba(255,59,107,0.25)' },
+  safe:  { label: 'SAFE',     color: '#00ff9d', bg: 'rgba(0,255,157,0.10)',  border: 'rgba(0,255,157,0.30)'  },
+  warn:  { label: 'CAUTION',  color: '#f5c518', bg: 'rgba(245,197,24,0.10)', border: 'rgba(245,197,24,0.30)' },
+  rug:   { label: 'RUG RISK', color: '#ff3b6b', bg: 'rgba(255,59,107,0.10)', border: 'rgba(255,59,107,0.30)' },
 };
 
 function formatPrice(price: number): string {
@@ -44,214 +58,93 @@ function formatPrice(price: number): string {
   return price.toFixed(5);
 }
 
-function formatMcap(mcap: number): string {
-  if (mcap >= 1_000_000) return `$${(mcap / 1_000_000).toFixed(2)}M`;
-  if (mcap >= 1_000) return `$${(mcap / 1_000).toFixed(1)}K`;
-  return `$${mcap}`;
+function formatMcap(val: number): string {
+  if (!val) return '—';
+  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
+  if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`;
+  return `$${val}`;
+}
+
+function formatVolume(val: number): string {
+  if (!val) return '—';
+  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
+  if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}K`;
+  return `$${val}`;
 }
 
 function formatAddress(addr: string): string {
   return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 }
 
-export default function Home() {
-  const [activeTab, setActiveTab] = useState<Tab>('listings');
-  const [watchlist, setWatchlist] = useState<string[]>([]);
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('watchlist');
-      if (stored) setWatchlist(JSON.parse(stored));
-    } catch {}
-  }, []);
-
-  function toggleWatchlist(address: string) {
-    setWatchlist((prev) => {
-      const next = prev.includes(address)
-        ? prev.filter((a) => a !== address)
-        : [...prev, address];
-      try {
-        localStorage.setItem('watchlist', JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-  }
-
-  const watchlistTokens = MOCK_TOKENS.filter((t) => watchlist.includes(t.address));
-
+function SafetyDonut({ score }: { score: number }) {
+  const r = 17;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  const color = score >= 70 ? '#00ff9d' : score >= 40 ? '#f5c518' : '#ff3b6b';
   return (
-    <>
-      <style>{`
-        :root {
-          --bg: #080b10;
-          --surface: #0e1318;
-          --accent: #00ff9d;
-          --accent2: #ff3b6b;
-          --text: #e8edf2;
-          --muted: #5a6a7a;
-        }
-
-        @keyframes pulse-dot {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-
-        .live-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
-
-        .token-card {
-          transition: border-color 0.15s, background 0.15s;
-        }
-        .token-card:hover {
-          border-color: rgba(0,255,157,0.25) !important;
-          background: rgba(14,19,24,0.95) !important;
-        }
-
-        .star-btn {
-          transition: color 0.15s, background 0.15s;
-        }
-        .star-btn:hover {
-          color: #f5c518 !important;
-        }
-      `}</style>
-
-      <div
-        className="flex flex-col min-h-screen"
-        style={{
-          background:
-            'radial-gradient(ellipse at top left, rgba(0,255,157,0.06) 0%, transparent 50%), ' +
-            'radial-gradient(ellipse at bottom right, rgba(139,92,246,0.08) 0%, transparent 50%), ' +
-            'var(--bg)',
-          color: 'var(--text)',
-          fontFamily: 'var(--font-space-mono), monospace',
-        }}
+    <svg width="48" height="48" viewBox="0 0 48 48" style={{ flexShrink: 0 }}>
+      <circle cx="24" cy="24" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
+      <circle
+        cx="24" cy="24" r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth="4"
+        strokeDasharray={`${circ}`}
+        strokeDashoffset={`${offset}`}
+        strokeLinecap="round"
+        transform="rotate(-90 24 24)"
+      />
+      <text
+        x="24" y="24"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        fontSize="11"
+        fontWeight="700"
+        fontFamily="monospace"
       >
-        {/* Header */}
-        <header style={{ background: 'var(--surface)', borderBottom: '1px solid rgba(0,255,157,0.12)' }}>
-          <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex flex-col gap-0.5">
-              <span
-                className="text-xl font-bold"
-                style={{ fontFamily: 'var(--font-syne), sans-serif', color: 'var(--accent)', letterSpacing: '-0.01em' }}
-              >
-                Birdeye Token Radar
-              </span>
-              <span className="text-xs tracking-widest uppercase" style={{ color: 'var(--muted)' }}>
-                Solana Token Intel
-              </span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="live-dot inline-block w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} />
-                <span className="text-xs font-bold tracking-widest" style={{ color: 'var(--accent)' }}>LIVE</span>
-              </div>
-
-              <button
-                onClick={() => setActiveTab('watchlist')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold"
-                style={{
-                  background: activeTab === 'watchlist' ? 'rgba(0,255,157,0.12)' : 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(0,255,157,0.2)',
-                  color: activeTab === 'watchlist' ? 'var(--accent)' : 'var(--muted)',
-                  cursor: 'pointer',
-                }}
-              >
-                WATCHLIST {watchlist.length}
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Tab Navigation */}
-        <nav style={{ background: 'var(--surface)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="max-w-6xl mx-auto px-4 flex">
-            {TABS.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="px-5 py-3 text-xs tracking-widest uppercase"
-                  style={{
-                    color: isActive ? 'var(--accent)' : 'var(--muted)',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
-                    cursor: 'pointer',
-                    fontWeight: isActive ? '700' : '400',
-                    marginBottom: '-1px',
-                    fontFamily: 'var(--font-space-mono), monospace',
-                  }}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </nav>
-
-        {/* Main Content */}
-        <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
-          {activeTab === 'listings' && (
-            <TokenList tokens={MOCK_TOKENS} watchlist={watchlist} onToggleWatchlist={toggleWatchlist} />
-          )}
-          {activeTab === 'trending' && (
-            <Placeholder title="Trending Breakouts" description="Momentum tokens heating up — coming soon." />
-          )}
-          {activeTab === 'whales' && (
-            <Placeholder title="Whale Tracker" description="Large wallet movements — coming soon." />
-          )}
-          {activeTab === 'watchlist' && (
-            watchlistTokens.length === 0 ? (
-              <Placeholder title="Watchlist Empty" description="Star a token from New Listings to track it here." />
-            ) : (
-              <TokenList tokens={watchlistTokens} watchlist={watchlist} onToggleWatchlist={toggleWatchlist} />
-            )
-          )}
-        </main>
-      </div>
-    </>
+        {score}
+      </text>
+    </svg>
   );
 }
 
-function TokenList({
-  tokens,
-  watchlist,
-  onToggleWatchlist,
-}: {
-  tokens: Token[];
-  watchlist: string[];
-  onToggleWatchlist: (address: string) => void;
-}) {
+function TokenIcon({ symbol }: { symbol: string }) {
+  const palette = ['#6366f1', '#8b5cf6', '#0ea5e9', '#f59e0b', '#10b981', '#ef4444', '#f97316', '#ec4899'];
+  const idx = (symbol.charCodeAt(0) + symbol.charCodeAt(symbol.length - 1)) % palette.length;
   return (
-    <div className="flex flex-col gap-2">
-      {/* Column headers */}
-      <div
-        className="grid text-xs px-4 pb-2"
-        style={{
-          gridTemplateColumns: '1fr 110px 110px 100px 90px 80px 64px 40px',
-          color: 'var(--muted)',
-          letterSpacing: '0.08em',
-        }}
-      >
-        <span>TOKEN</span>
-        <span className="text-right">PRICE</span>
-        <span className="text-right">24H</span>
-        <span className="text-right">MCAP</span>
-        <span className="text-right">HOLDERS</span>
-        <span className="text-right">LISTED</span>
-        <span className="text-right">SAFETY</span>
-        <span />
-      </div>
+    <div style={{
+      width: 40, height: 40, borderRadius: '50%',
+      background: palette[idx],
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 15, fontWeight: 700, color: '#fff', flexShrink: 0,
+      fontFamily: 'var(--font-syne), sans-serif',
+    }}>
+      {symbol[0]}
+    </div>
+  );
+}
 
-      {tokens.map((token) => (
-        <TokenCard
-          key={token.address}
-          token={token}
-          starred={watchlist.includes(token.address)}
-          onToggleStar={() => onToggleWatchlist(token.address)}
-        />
-      ))}
+function SafetyBadge({ safety }: { safety: Safety }) {
+  const cfg = SAFETY_CONFIG[safety];
+  return (
+    <span style={{
+      color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`,
+      padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+      letterSpacing: '0.06em', whiteSpace: 'nowrap', lineHeight: 1.6,
+    }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function DataCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font-space-mono), monospace' }}>{value}</div>
     </div>
   );
 }
@@ -261,97 +154,128 @@ function TokenCard({
   starred,
   onToggleStar,
 }: {
-  token: Token;
+  token: DisplayToken;
   starred: boolean;
   onToggleStar: () => void;
 }) {
-  const safety = SAFETY_CONFIG[token.safety];
-  const changePositive = token.change24h >= 0;
-
+  const changePos = token.change24h >= 0;
   return (
     <div
-      className="token-card grid items-center px-4 py-3 rounded-lg"
+      className="token-card"
       style={{
-        gridTemplateColumns: '1fr 110px 110px 100px 90px 80px 64px 40px',
         background: 'var(--surface)',
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        borderRadius: 12,
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
       }}
     >
-      {/* Token name/symbol */}
-      <div className="flex flex-col gap-0.5 min-w-0">
-        <span
-          className="text-sm font-bold truncate"
-          style={{ color: 'var(--text)', fontFamily: 'var(--font-syne), sans-serif' }}
-        >
-          {token.symbol}
+      {/* Top row: icon + symbol/name/badge + donut */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <TokenIcon symbol={token.symbol} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{
+              fontFamily: 'var(--font-syne), sans-serif',
+              fontWeight: 700, fontSize: 15,
+              color: 'var(--text)',
+            }}>
+              {token.symbol}
+            </span>
+            <SafetyBadge safety={token.safety} />
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+            {token.name}
+            <span style={{ opacity: 0.5 }}> · {formatAddress(token.address)}</span>
+          </div>
+        </div>
+        <SafetyDonut score={token.safetyScore} />
+      </div>
+
+      {/* Price + change */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{
+          fontSize: 20, fontWeight: 700,
+          color: 'var(--text)',
+          fontFamily: 'var(--font-space-mono), monospace',
+        }}>
+          ${formatPrice(token.price)}
         </span>
-        <span className="text-xs truncate" style={{ color: 'var(--muted)' }}>
-          {token.name}&nbsp;&nbsp;
-          <span style={{ opacity: 0.5 }}>{formatAddress(token.address)}</span>
+        <span style={{
+          fontSize: 12, fontWeight: 700,
+          color: changePos ? '#00ff9d' : '#ff3b6b',
+        }}>
+          {changePos ? '+' : ''}{token.change24h}%
         </span>
       </div>
 
-      {/* Price */}
-      <span className="text-right text-xs tabular-nums" style={{ color: 'var(--text)' }}>
-        ${formatPrice(token.price)}
-      </span>
-
-      {/* 24h change */}
-      <span
-        className="text-right text-xs font-bold tabular-nums"
-        style={{ color: changePositive ? '#00ff9d' : '#ff3b6b' }}
-      >
-        {changePositive ? '+' : ''}{token.change24h}%
-      </span>
-
-      {/* Market cap */}
-      <span className="text-right text-xs tabular-nums" style={{ color: 'var(--muted)' }}>
-        {formatMcap(token.mcap)}
-      </span>
-
-      {/* Holders */}
-      <span className="text-right text-xs tabular-nums" style={{ color: 'var(--muted)' }}>
-        {token.holders.toLocaleString()}
-      </span>
-
-      {/* Age */}
-      <span className="text-right text-xs" style={{ color: 'var(--muted)' }}>
-        {token.age}
-      </span>
-
-      {/* Safety badge */}
-      <div className="flex justify-end">
-        <span
-          className="text-xs font-bold px-1.5 py-0.5 rounded"
-          style={{
-            color: safety.color,
-            background: safety.bg,
-            border: `1px solid ${safety.border}`,
-            letterSpacing: '0.04em',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {safety.label}
-        </span>
+      {/* 2x2 data grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 8px' }}>
+        <DataCell label="MARKET CAP" value={formatMcap(token.mcap)} />
+        <DataCell label="24H VOLUME" value={formatVolume(token.volume24h)} />
+        <DataCell label="LIQUIDITY" value={token.liquidity ? formatVolume(token.liquidity) : '—'} />
+        <DataCell label="HOLDERS" value={token.holders > 0 ? token.holders.toLocaleString() : '—'} />
       </div>
 
-      {/* Star button */}
-      <div className="flex justify-end">
+      {/* Footer */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 10,
+      }}>
+        <span style={{ fontSize: 11, color: 'var(--accent)', opacity: 0.65, cursor: 'pointer' }}>
+          Click for full breakdown
+        </span>
         <button
           onClick={onToggleStar}
-          className="star-btn text-base leading-none p-1 rounded"
+          className="star-btn"
           style={{
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            fontSize: 18, lineHeight: 1,
             color: starred ? '#f5c518' : 'var(--muted)',
-            opacity: starred ? 1 : 0.6,
+            padding: '2px 4px',
           }}
           aria-label={starred ? 'Remove from watchlist' : 'Add to watchlist'}
         >
           {starred ? '★' : '☆'}
         </button>
       </div>
+    </div>
+  );
+}
+
+function MarketOverviewBar({ tokens }: { tokens: DisplayToken[] }) {
+  const total = tokens.length;
+  if (total === 0) return null;
+  const safeN = tokens.filter(t => t.safety === 'safe').length;
+  const cautionN = tokens.filter(t => t.safety === 'warn').length;
+  const riskyN = tokens.filter(t => t.safety === 'rug').length;
+  const safePct = (safeN / total) * 100;
+  const cautionPct = (cautionN / total) * 100;
+  const riskyPct = (riskyN / total) * 100;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+      <span style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.12em', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
+        Market Overview
+      </span>
+      <div style={{
+        flex: 1, height: 6, borderRadius: 3,
+        overflow: 'hidden',
+        background: 'rgba(255,255,255,0.05)',
+        display: 'flex',
+      }}>
+        <div style={{ width: `${safePct}%`, background: '#00ff9d', transition: 'width 0.4s' }} />
+        <div style={{ width: `${cautionPct}%`, background: '#f5c518', transition: 'width 0.4s' }} />
+        <div style={{ width: `${riskyPct}%`, background: '#ff3b6b', transition: 'width 0.4s' }} />
+      </div>
+      <span style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+        <span style={{ color: '#00ff9d' }}>{safeN} safe</span>
+        <span style={{ color: 'var(--muted)' }}> · </span>
+        <span style={{ color: '#f5c518' }}>{cautionN} caution</span>
+        <span style={{ color: 'var(--muted)' }}> · </span>
+        <span style={{ color: '#ff3b6b' }}>{riskyN} risky</span>
+      </span>
     </div>
   );
 }
@@ -369,5 +293,398 @@ function Placeholder({ title, description }: { title: string; description: strin
         {description}
       </p>
     </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function Home() {
+  const [activeTab, setActiveTab] = useState<Tab>('trending');
+  const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const [safetyFilter, setSafetyFilter] = useState<SafetyFilter>('all');
+  const [sortField, setSortField] = useState<SortField>('safetyScore');
+  const [updateTime, setUpdateTime] = useState('');
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('watchlist');
+      if (stored) setWatchlist(JSON.parse(stored));
+    } catch {}
+    const now = new Date();
+    const hh = now.getHours().toString().padStart(2, '0');
+    const mm = now.getMinutes().toString().padStart(2, '0');
+    setUpdateTime(`${hh}:${mm}`);
+  }, []);
+
+  // Reset filters on tab switch
+  useEffect(() => {
+    setSearch('');
+    setSafetyFilter('all');
+  }, [activeTab]);
+
+  function toggleWatchlist(address: string) {
+    setWatchlist(prev => {
+      const next = prev.includes(address)
+        ? prev.filter(a => a !== address)
+        : [...prev, address];
+      try { localStorage.setItem('watchlist', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+
+  const allKnown = useMemo(() => {
+    const map = new Map<string, DisplayToken>();
+    [...MOCK_LISTINGS, ...MOCK_TRENDING].forEach(t => map.set(t.address, t));
+    return Array.from(map.values());
+  }, []);
+
+  const watchlistTokens = useMemo(
+    () => allKnown.filter(t => watchlist.includes(t.address)),
+    [allKnown, watchlist]
+  );
+
+  const baseTokens: DisplayToken[] = useMemo(() => {
+    if (activeTab === 'listings') return MOCK_LISTINGS;
+    if (activeTab === 'trending') return MOCK_TRENDING;
+    if (activeTab === 'watchlist') return watchlistTokens;
+    return [];
+  }, [activeTab, watchlistTokens]);
+
+  const safeCount   = useMemo(() => baseTokens.filter(t => t.safety === 'safe').length, [baseTokens]);
+  const cautionCount = useMemo(() => baseTokens.filter(t => t.safety === 'warn').length, [baseTokens]);
+  const riskyCount  = useMemo(() => baseTokens.filter(t => t.safety === 'rug').length, [baseTokens]);
+
+  const filteredTokens = useMemo(() => {
+    return baseTokens
+      .filter(t => {
+        const q = search.trim().toLowerCase();
+        if (q && !t.symbol.toLowerCase().includes(q) && !t.name.toLowerCase().includes(q) && !t.address.toLowerCase().includes(q)) return false;
+        if (safetyFilter === 'safe'    && t.safety !== 'safe') return false;
+        if (safetyFilter === 'caution' && t.safety !== 'warn') return false;
+        if (safetyFilter === 'risky'   && t.safety !== 'rug')  return false;
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortField === 'safetyScore') return b.safetyScore - a.safetyScore;
+        if (sortField === 'mcap')        return b.mcap - a.mcap;
+        return b.volume24h - a.volume24h;
+      });
+  }, [baseTokens, search, safetyFilter, sortField]);
+
+  const showGrid = activeTab !== 'whales';
+  const showEmpty = activeTab === 'watchlist' && baseTokens.length === 0;
+
+  return (
+    <>
+      <style>{`
+        :root {
+          --bg: #080b10;
+          --surface: #0e1318;
+          --accent: #00ff9d;
+          --accent2: #ff3b6b;
+          --text: #e8edf2;
+          --muted: #5a6a7a;
+        }
+
+        * { box-sizing: border-box; }
+
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        .live-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+
+        .token-card { transition: border-color 0.15s, box-shadow 0.15s; }
+        .token-card:hover {
+          border-color: rgba(99,102,241,0.35) !important;
+          box-shadow: 0 0 0 1px rgba(99,102,241,0.15);
+        }
+
+        .star-btn { transition: color 0.15s; }
+        .star-btn:hover { color: #f5c518 !important; }
+
+        .filter-btn { transition: background 0.12s, border-color 0.12s, color 0.12s; }
+        .sort-btn   { transition: background 0.12s, border-color 0.12s, color 0.12s; }
+
+        input[type="text"]:focus { outline: none; border-color: rgba(99,102,241,0.6) !important; }
+
+        @media (max-width: 900px) {
+          .token-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media (max-width: 600px) {
+          .token-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+
+      <div
+        style={{
+          minHeight: '100vh',
+          background:
+            'radial-gradient(ellipse at top left, rgba(0,255,157,0.05) 0%, transparent 50%), ' +
+            'radial-gradient(ellipse at bottom right, rgba(99,102,241,0.07) 0%, transparent 50%), ' +
+            'var(--bg)',
+          color: 'var(--text)',
+          fontFamily: 'var(--font-space-mono), monospace',
+        }}
+      >
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <header style={{
+          background: 'var(--surface)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div style={{ maxWidth: 1280, margin: '0 auto', padding: '14px 24px' }}>
+            {/* Row 1: title + meta */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <div style={{
+                  fontFamily: 'var(--font-syne), sans-serif',
+                  fontWeight: 700, fontSize: 20,
+                  color: 'var(--accent)',
+                  letterSpacing: '-0.01em',
+                }}>
+                  Birdeye Token Radar
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, letterSpacing: '0.04em' }}>
+                  Powered by Birdeye API · Solana
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* API call counter */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '5px 10px', borderRadius: 6,
+                  background: 'rgba(99,102,241,0.10)',
+                  border: '1px solid rgba(99,102,241,0.25)',
+                }}>
+                  <span className="live-dot inline-block" style={{
+                    width: 6, height: 6, borderRadius: '50%', background: '#6366f1',
+                  }} />
+                  <span style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 700 }}>124 API calls</span>
+                </div>
+
+                {/* Updated time */}
+                {updateTime && (
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    Updated {updateTime}
+                  </span>
+                )}
+
+                {/* Refresh button */}
+                <button
+                  style={{
+                    padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: 'var(--text)', fontSize: 11, fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    fontFamily: 'var(--font-space-mono), monospace',
+                  }}
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2: safety legend */}
+            <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
+              {[
+                { dot: '#00ff9d', label: 'Safe (70-100)' },
+                { dot: '#f5c518', label: 'Caution (40-69)' },
+                { dot: '#ff3b6b', label: 'Risky (0-39)' },
+              ].map(({ dot, label }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, display: 'inline-block' }} />
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </header>
+
+        {/* ── Tab Navigation ──────────────────────────────────────────────── */}
+        <nav style={{
+          background: 'var(--surface)',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+        }}>
+          <div style={{ maxWidth: 1280, margin: '0 auto', padding: '12px 24px', display: 'flex', gap: 8 }}>
+            {TABS.map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    padding: '7px 18px', borderRadius: 8, cursor: 'pointer',
+                    fontSize: 13, fontWeight: 700,
+                    fontFamily: 'var(--font-syne), sans-serif',
+                    letterSpacing: '0.01em',
+                    background: isActive ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.03)',
+                    border: isActive
+                      ? '1px solid rgba(99,102,241,0.55)'
+                      : '1px solid rgba(255,255,255,0.09)',
+                    color: isActive ? '#a5b4fc' : 'var(--muted)',
+                    transition: 'all 0.12s',
+                  }}
+                >
+                  {tab.label}
+                  {tab.id === 'watchlist' && watchlist.length > 0 && (
+                    <span style={{
+                      marginLeft: 6, fontSize: 10, fontWeight: 700,
+                      background: 'rgba(99,102,241,0.35)',
+                      color: '#a5b4fc', padding: '1px 5px', borderRadius: 10,
+                    }}>
+                      {watchlist.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* ── Main Content ─────────────────────────────────────────────────── */}
+        <main style={{ maxWidth: 1280, margin: '0 auto', padding: '24px' }}>
+
+          {activeTab === 'whales' && (
+            <Placeholder title="Whale Tracker" description="Large wallet movements — coming soon." />
+          )}
+
+          {activeTab === 'watchlist' && showEmpty && (
+            <Placeholder title="Watchlist Empty" description="Star a token to track it here." />
+          )}
+
+          {showGrid && !showEmpty && (
+            <>
+              {/* Filter Bar */}
+              <div style={{ marginBottom: 16 }}>
+                {/* Search input */}
+                <input
+                  type="text"
+                  placeholder="Filter by name, symbol or address..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{
+                    width: '100%', padding: '9px 14px',
+                    borderRadius: 8, marginBottom: 10,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    color: 'var(--text)', fontSize: 13,
+                    fontFamily: 'var(--font-space-mono), monospace',
+                  }}
+                />
+
+                {/* Filter + Sort row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  {/* Safety filter buttons */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {([
+                      { id: 'all',     label: 'All',     count: baseTokens.length },
+                      { id: 'safe',    label: 'Safe',    count: safeCount },
+                      { id: 'caution', label: 'Caution', count: cautionCount },
+                      { id: 'risky',   label: 'Risky',   count: riskyCount },
+                    ] as { id: SafetyFilter; label: string; count: number }[]).map(({ id, label, count }) => {
+                      const isActive = safetyFilter === id;
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => setSafetyFilter(id)}
+                          className="filter-btn"
+                          style={{
+                            padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                            fontSize: 12, fontWeight: 700,
+                            fontFamily: 'var(--font-space-mono), monospace',
+                            background: isActive ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.03)',
+                            border: isActive
+                              ? '1px solid rgba(99,102,241,0.55)'
+                              : '1px solid rgba(255,255,255,0.09)',
+                            color: isActive ? '#a5b4fc' : 'var(--muted)',
+                            display: 'flex', alignItems: 'center', gap: 6,
+                          }}
+                        >
+                          {label}
+                          <span style={{
+                            fontSize: 10, padding: '1px 5px', borderRadius: 8,
+                            background: isActive ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.07)',
+                            color: isActive ? '#c7d2fe' : 'var(--muted)',
+                          }}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Sort buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em', marginRight: 4 }}>SORT</span>
+                    {([
+                      { id: 'safetyScore', label: 'Safety Score' },
+                      { id: 'mcap',        label: 'Market Cap' },
+                      { id: 'volume24h',   label: 'Volume' },
+                    ] as { id: SortField; label: string }[]).map(({ id, label }) => {
+                      const isActive = sortField === id;
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => setSortField(id)}
+                          className="sort-btn"
+                          style={{
+                            padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                            fontSize: 11, fontWeight: 700,
+                            fontFamily: 'var(--font-space-mono), monospace',
+                            background: isActive ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.03)',
+                            border: isActive
+                              ? '1px solid rgba(99,102,241,0.45)'
+                              : '1px solid rgba(255,255,255,0.08)',
+                            color: isActive ? '#a5b4fc' : 'var(--muted)',
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Market Overview Bar */}
+              <MarketOverviewBar tokens={baseTokens} />
+
+              {/* Token Grid */}
+              {filteredTokens.length === 0 ? (
+                <div style={{
+                  textAlign: 'center', padding: '48px 0',
+                  color: 'var(--muted)', fontSize: 13,
+                  border: '1px dashed rgba(255,255,255,0.08)',
+                  borderRadius: 10,
+                }}>
+                  No tokens match your filters.
+                </div>
+              ) : (
+                <div
+                  className="token-grid"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 16,
+                  }}
+                >
+                  {filteredTokens.map(token => (
+                    <TokenCard
+                      key={token.address}
+                      token={token}
+                      starred={watchlist.includes(token.address)}
+                      onToggleStar={() => toggleWatchlist(token.address)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </main>
+      </div>
+    </>
   );
 }
