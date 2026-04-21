@@ -60,11 +60,22 @@ const TABS: { id: Tab; label: string }[] = [
 // Tabs that show a coming-soon placeholder
 const PLACEHOLDER_TABS: Partial<Record<Tab, string>> = {
   livefeed:    'Live Feed',
-  whalerader:  'Whale Radar',
   mememonitor: 'Meme Monitor',
   smartmoney:  'Smart Money',
   defipulse:   'DeFi Pulse',
 };
+
+interface WhaleTx {
+  txHash: string;
+  side: string;
+  tokenSymbol: string;
+  tokenAddress: string;
+  counterSymbol: string;
+  amountUsd: number;
+  walletAddress: string;
+  timeAgo: string;
+  dex: string;
+}
 
 const SAFETY_CONFIG: Record<Safety, { label: string; color: string; bg: string; border: string; glow: string }> = {
   safe: { label: 'SAFE',     color: '#00ff9d', bg: 'rgba(0,255,157,0.10)',  border: 'rgba(0,255,157,0.40)',  glow: 'rgba(0,255,157,0.13)'  },
@@ -335,6 +346,132 @@ function Placeholder({ title, description }: { title: string; description: strin
   );
 }
 
+function formatUsd(val: number): string {
+  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
+  if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`;
+  return `$${val.toFixed(0)}`;
+}
+
+function WhaleTable({ txs, loading }: { txs: WhaleTx[]; loading: boolean }) {
+  if (loading && txs.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--muted)', fontSize: 13 }}>
+        Loading whale transactions...
+      </div>
+    );
+  }
+  if (txs.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--muted)', fontSize: 13,
+        border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10 }}>
+        No whale transactions found.
+      </div>
+    );
+  }
+
+  const COL_WIDTHS = ['90px', '80px', '1fr', '140px', '110px', '120px', '80px'];
+
+  return (
+    <div style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+      {/* Header row */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: COL_WIDTHS.join(' '),
+        gap: '0 16px',
+        padding: '8px 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        marginBottom: 4,
+      }}>
+        {['SIDE', 'TOKEN', 'WALLET', 'AMOUNT', 'DEX', 'PAIR', 'TIME'].map(h => (
+          <span key={h} style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.10em', fontWeight: 700 }}>
+            {h}
+          </span>
+        ))}
+      </div>
+
+      {/* Data rows */}
+      {txs.map((tx, i) => {
+        const isBuy = tx.side === 'buy';
+        const sideColor = isBuy ? '#00ff9d' : '#ff3b6b';
+        const sideBg    = isBuy ? 'rgba(0,255,157,0.10)' : 'rgba(255,59,107,0.10)';
+        const sideBorder= isBuy ? 'rgba(0,255,157,0.30)' : 'rgba(255,59,107,0.30)';
+        const dexLabel  = tx.dex.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+        return (
+          <div
+            key={tx.txHash + i}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: COL_WIDTHS.join(' '),
+              gap: '0 16px',
+              padding: '12px 16px',
+              borderBottom: '1px solid rgba(255,255,255,0.04)',
+              alignItems: 'center',
+              transition: 'background 0.1s',
+            }}
+            className="whale-row"
+          >
+            {/* Side badge */}
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              padding: '3px 8px', borderRadius: 4,
+              background: sideBg, border: `1px solid ${sideBorder}`,
+              color: sideColor, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+              width: 'fit-content',
+            }}>
+              {isBuy ? 'BUY' : 'SELL'}
+            </span>
+
+            {/* Token symbol */}
+            <span style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+              {tx.tokenSymbol}
+            </span>
+
+            {/* Wallet */}
+            <a
+              href={`https://solscan.io/account/${tx.walletAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontFamily: 'var(--font-space-mono), monospace',
+                fontSize: 12, color: 'var(--muted)', textDecoration: 'none',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}
+              className="whale-wallet-link"
+            >
+              {tx.walletAddress.slice(0, 4)}...{tx.walletAddress.slice(-4)}
+            </a>
+
+            {/* Amount */}
+            <span style={{
+              fontFamily: 'var(--font-space-mono), monospace',
+              fontSize: 14, fontWeight: 700,
+              color: isBuy ? '#00ff9d' : '#ff3b6b',
+            }}>
+              {formatUsd(tx.amountUsd)}
+            </span>
+
+            {/* DEX */}
+            <span style={{ fontSize: 12, color: '#a5b4fc' }}>
+              {dexLabel}
+            </span>
+
+            {/* Pair */}
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+              {tx.tokenSymbol}/{tx.counterSymbol}
+            </span>
+
+            {/* Time */}
+            <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+              {tx.timeAgo}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -347,6 +484,8 @@ export default function Home() {
 
   const [trendingTokens, setTrendingTokens] = useState<DisplayToken[]>(FALLBACK_TRENDING);
   const [listingTokens, setListingTokens] = useState<DisplayToken[]>(FALLBACK_LISTINGS);
+  const [whaleTxs, setWhaleTxs] = useState<WhaleTx[]>([]);
+  const [whaleLoading, setWhaleLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [apiCallCount, setApiCallCount] = useState(0);
   const apiCallRef = useRef(0);
@@ -419,6 +558,19 @@ export default function Home() {
     setLoading(false);
   }, []);
 
+  const fetchWhales = useCallback(async () => {
+    setWhaleLoading(true);
+    bumpApiCount(3);
+    try {
+      const res = await fetch('/api/whales');
+      if (res.ok) {
+        const json = await res.json();
+        setWhaleTxs(json.whales ?? []);
+      }
+    } catch {}
+    setWhaleLoading(false);
+  }, []);
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('watchlist');
@@ -430,13 +582,19 @@ export default function Home() {
     setUpdateTime(`${hh}:${mm}`);
 
     fetchAllData();
-  }, [fetchAllData]);
+    fetchWhales();
+  }, [fetchAllData, fetchWhales]);
 
-  // Auto-refresh every 60 seconds
+  // Auto-refresh every 60 seconds (trending/listings) and 30s (whales)
   useEffect(() => {
     const id = setInterval(fetchAllData, 60_000);
     return () => clearInterval(id);
   }, [fetchAllData]);
+
+  useEffect(() => {
+    const id = setInterval(fetchWhales, 30_000);
+    return () => clearInterval(id);
+  }, [fetchWhales]);
 
   // Reset filters on tab switch
   useEffect(() => {
@@ -529,6 +687,8 @@ export default function Home() {
         .sort-btn   { transition: background 0.12s, border-color 0.12s, color 0.12s; }
 
         .birdeye-link:hover { color: var(--accent) !important; opacity: 1 !important; }
+        .whale-row:hover { background: rgba(255,255,255,0.025); }
+        .whale-wallet-link:hover { color: var(--accent) !important; }
 
         input[type="text"]:focus { outline: none; border-color: rgba(99,102,241,0.6) !important; }
 
@@ -685,6 +845,44 @@ export default function Home() {
 
         {/* ── Main Content ─────────────────────────────────────────────────── */}
         <main style={{ maxWidth: 1280, margin: '0 auto', padding: '24px' }}>
+
+          {/* Whale Radar tab */}
+          {activeTab === 'whalerader' && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
+                    Whale Radar
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+                    Large swaps on SOL, USDC and mSOL — min $5K — refreshes every 30s
+                  </div>
+                </div>
+                <button
+                  onClick={fetchWhales}
+                  disabled={whaleLoading}
+                  style={{
+                    padding: '5px 12px', borderRadius: 6, cursor: whaleLoading ? 'not-allowed' : 'pointer',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: whaleLoading ? 'var(--muted)' : 'var(--text)', fontSize: 11, fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    fontFamily: 'var(--font-space-mono), monospace',
+                  }}
+                >
+                  {whaleLoading ? 'Loading...' : 'Refresh'}
+                </button>
+              </div>
+              <div style={{
+                background: 'var(--surface)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: 12,
+                overflow: 'hidden',
+              }}>
+                <WhaleTable txs={whaleTxs} loading={whaleLoading} />
+              </div>
+            </>
+          )}
 
           {/* Coming-soon placeholder tabs */}
           {isPlaceholderTab && (
