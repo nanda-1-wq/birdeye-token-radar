@@ -59,8 +59,6 @@ const TABS: { id: Tab; label: string }[] = [
 
 // Tabs that show a coming-soon placeholder
 const PLACEHOLDER_TABS: Partial<Record<Tab, string>> = {
-  livefeed:    'Live Feed',
-  mememonitor: 'Meme Monitor',
   smartmoney:  'Smart Money',
   defipulse:   'DeFi Pulse',
 };
@@ -497,6 +495,10 @@ export default function Home() {
 
   const [trendingTokens, setTrendingTokens] = useState<DisplayToken[]>(FALLBACK_TRENDING);
   const [listingTokens, setListingTokens] = useState<DisplayToken[]>(FALLBACK_LISTINGS);
+  const [livefeedTokens, setLivefeedTokens] = useState<DisplayToken[]>([]);
+  const [memeTokens, setMemeTokens] = useState<DisplayToken[]>([]);
+  const [livefeedLoading, setLivefeedLoading] = useState(false);
+  const [memeLoading, setMemeLoading] = useState(false);
   const [whaleTxs, setWhaleTxs] = useState<WhaleTx[]>([]);
   const [whaleLoading, setWhaleLoading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -584,6 +586,66 @@ export default function Home() {
     setWhaleLoading(false);
   }, []);
 
+  const fetchLivefeed = useCallback(async () => {
+    setLivefeedLoading(true);
+    bumpApiCount(2);
+    try {
+      const res = await fetch('/api/livefeed');
+      if (res.ok) {
+        const json = await res.json();
+        const items: Record<string, unknown>[] = json?.data?.tokens ?? [];
+        setLivefeedTokens(items.map((t) => {
+          const score = computeProxyScore(Number(t.liquidity ?? 0), Number(t.marketcap ?? 0), Number(t.priceChange24hPercent ?? 0));
+          return {
+            symbol: String(t.symbol || '???'),
+            name: String(t.name || t.symbol || '???'),
+            address: String(t.address ?? ''),
+            price: Number(t.price ?? 0),
+            change24h: Number(t.priceChange24hPercent ?? 0),
+            mcap: Number(t.marketcap ?? 0),
+            safety: mapSecurityToSafety(score),
+            safetyScore: score,
+            holders: 0,
+            age: '',
+            volume24h: Number(t.volume24hUSD ?? 0),
+            liquidity: Number(t.liquidity ?? 0),
+          };
+        }));
+      }
+    } catch {}
+    setLivefeedLoading(false);
+  }, []);
+
+  const fetchMemes = useCallback(async () => {
+    setMemeLoading(true);
+    bumpApiCount(1);
+    try {
+      const res = await fetch('/api/memes');
+      if (res.ok) {
+        const json = await res.json();
+        const items: Record<string, unknown>[] = json?.data?.tokens ?? [];
+        setMemeTokens(items.map((t) => {
+          const score = computeProxyScore(Number(t.liquidity ?? 0), Number(t.marketcap ?? 0), Number(t.priceChange24hPercent ?? 0));
+          return {
+            symbol: String(t.symbol || '???'),
+            name: String(t.name || t.symbol || '???'),
+            address: String(t.address ?? ''),
+            price: Number(t.price ?? 0),
+            change24h: Number(t.priceChange24hPercent ?? 0),
+            mcap: Number(t.marketcap ?? 0),
+            safety: mapSecurityToSafety(score),
+            safetyScore: score,
+            holders: 0,
+            age: '',
+            volume24h: Number(t.volume24hUSD ?? 0),
+            liquidity: Number(t.liquidity ?? 0),
+          };
+        }));
+      }
+    } catch {}
+    setMemeLoading(false);
+  }, []);
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('watchlist');
@@ -596,7 +658,9 @@ export default function Home() {
 
     fetchAllData();
     fetchWhales();
-  }, [fetchAllData, fetchWhales]);
+    fetchLivefeed();
+    fetchMemes();
+  }, [fetchAllData, fetchWhales, fetchLivefeed, fetchMemes]);
 
   // Auto-refresh every 60 seconds (trending/listings) and 30s (whales)
   useEffect(() => {
@@ -608,6 +672,16 @@ export default function Home() {
     const id = setInterval(fetchWhales, 30_000);
     return () => clearInterval(id);
   }, [fetchWhales]);
+
+  useEffect(() => {
+    const id = setInterval(fetchLivefeed, 15_000);
+    return () => clearInterval(id);
+  }, [fetchLivefeed]);
+
+  useEffect(() => {
+    const id = setInterval(fetchMemes, 20_000);
+    return () => clearInterval(id);
+  }, [fetchMemes]);
 
   // Reset filters on tab switch
   useEffect(() => {
@@ -639,9 +713,11 @@ export default function Home() {
   const baseTokens: DisplayToken[] = useMemo(() => {
     if (activeTab === 'listings') return listingTokens;
     if (activeTab === 'trending') return trendingTokens;
+    if (activeTab === 'livefeed') return livefeedTokens;
+    if (activeTab === 'mememonitor') return memeTokens;
     if (activeTab === 'watchlist') return watchlistTokens;
     return [];
-  }, [activeTab, listingTokens, trendingTokens, watchlistTokens]);
+  }, [activeTab, listingTokens, trendingTokens, livefeedTokens, memeTokens, watchlistTokens]);
 
   const safeCount    = useMemo(() => baseTokens.filter(t => t.safety === 'safe').length, [baseTokens]);
   const cautionCount = useMemo(() => baseTokens.filter(t => t.safety === 'warn').length, [baseTokens]);
@@ -665,8 +741,14 @@ export default function Home() {
   }, [baseTokens, search, safetyFilter, sortField]);
 
   const isPlaceholderTab = activeTab in PLACEHOLDER_TABS;
-  const showGrid  = (activeTab === 'trending' || activeTab === 'listings' || activeTab === 'watchlist') && !isPlaceholderTab;
+  const TOKEN_GRID_TABS: Tab[] = ['trending', 'listings', 'livefeed', 'mememonitor', 'watchlist'];
+  const showGrid  = TOKEN_GRID_TABS.includes(activeTab) && !isPlaceholderTab;
   const showEmpty = activeTab === 'watchlist' && baseTokens.length === 0;
+  const isTabLoading =
+    (activeTab === 'livefeed' && livefeedLoading) ||
+    (activeTab === 'mememonitor' && memeLoading) ||
+    (activeTab === 'trending' && loading) ||
+    (activeTab === 'listings' && loading);
 
   return (
     <>
@@ -998,7 +1080,14 @@ export default function Home() {
               <MarketOverviewBar tokens={baseTokens} />
 
               {/* Token Grid */}
-              {filteredTokens.length === 0 ? (
+              {isTabLoading && baseTokens.length === 0 ? (
+                <div style={{
+                  textAlign: 'center', padding: '64px 0',
+                  color: 'var(--muted)', fontSize: 13,
+                }}>
+                  Loading...
+                </div>
+              ) : filteredTokens.length === 0 ? (
                 <div style={{
                   textAlign: 'center', padding: '48px 0',
                   color: 'var(--muted)', fontSize: 13,
@@ -1014,7 +1103,7 @@ export default function Home() {
                     display: 'grid',
                     gridTemplateColumns: 'repeat(3, 1fr)',
                     gap: 16,
-                    opacity: loading ? 0.5 : 1,
+                    opacity: isTabLoading ? 0.5 : 1,
                     transition: 'opacity 0.2s',
                   }}
                 >
