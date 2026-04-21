@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 
-type Tab = 'trending' | 'listings' | 'whales' | 'watchlist';
+type Tab = 'trending' | 'listings' | 'livefeed' | 'whalerader' | 'mememonitor' | 'smartmoney' | 'defipulse' | 'watchlist';
 type Safety = 'safe' | 'warn' | 'rug';
 type SafetyFilter = 'all' | 'safe' | 'caution' | 'risky';
 type SortField = 'safetyScore' | 'mcap' | 'volume24h';
@@ -40,16 +40,29 @@ const MOCK_TRENDING: DisplayToken[] = [
 ];
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'trending', label: 'Trending' },
-  { id: 'listings', label: 'New Listings' },
-  { id: 'whales', label: 'Whales' },
-  { id: 'watchlist', label: 'Watchlist' },
+  { id: 'trending',    label: 'Trending' },
+  { id: 'listings',   label: 'New Listings' },
+  { id: 'livefeed',   label: 'Live Feed' },
+  { id: 'whalerader', label: 'Whale Radar' },
+  { id: 'mememonitor',label: 'Meme Monitor' },
+  { id: 'smartmoney', label: 'Smart Money' },
+  { id: 'defipulse',  label: 'DeFi Pulse' },
+  { id: 'watchlist',  label: 'Watchlist' },
 ];
 
-const SAFETY_CONFIG: Record<Safety, { label: string; color: string; bg: string; border: string }> = {
-  safe:  { label: 'SAFE',     color: '#00ff9d', bg: 'rgba(0,255,157,0.10)',  border: 'rgba(0,255,157,0.30)'  },
-  warn:  { label: 'CAUTION',  color: '#f5c518', bg: 'rgba(245,197,24,0.10)', border: 'rgba(245,197,24,0.30)' },
-  rug:   { label: 'RUG RISK', color: '#ff3b6b', bg: 'rgba(255,59,107,0.10)', border: 'rgba(255,59,107,0.30)' },
+// Tabs that show a coming-soon placeholder
+const PLACEHOLDER_TABS: Partial<Record<Tab, string>> = {
+  livefeed:    'Live Feed',
+  whalerader:  'Whale Radar',
+  mememonitor: 'Meme Monitor',
+  smartmoney:  'Smart Money',
+  defipulse:   'DeFi Pulse',
+};
+
+const SAFETY_CONFIG: Record<Safety, { label: string; color: string; bg: string; border: string; glow: string }> = {
+  safe: { label: 'SAFE',     color: '#00ff9d', bg: 'rgba(0,255,157,0.10)',  border: 'rgba(0,255,157,0.40)',  glow: 'rgba(0,255,157,0.13)'  },
+  warn: { label: 'CAUTION',  color: '#f5a623', bg: 'rgba(245,166,35,0.10)', border: 'rgba(245,166,35,0.40)', glow: 'rgba(245,166,35,0.13)' },
+  rug:  { label: 'RUG RISK', color: '#ff3b6b', bg: 'rgba(255,59,107,0.10)', border: 'rgba(255,59,107,0.40)', glow: 'rgba(255,59,107,0.13)' },
 };
 
 function formatPrice(price: number): string {
@@ -79,29 +92,29 @@ function formatAddress(addr: string): string {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SafetyDonut({ score }: { score: number }) {
-  const r = 17;
+  const r = 26;
   const circ = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ;
-  const color = score >= 70 ? '#00ff9d' : score >= 40 ? '#f5c518' : '#ff3b6b';
+  const color = score >= 70 ? '#00ff9d' : score >= 40 ? '#f5a623' : '#ff3b6b';
   return (
-    <svg width="48" height="48" viewBox="0 0 48 48" style={{ flexShrink: 0 }}>
-      <circle cx="24" cy="24" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
+    <svg width="64" height="64" viewBox="0 0 64 64" style={{ flexShrink: 0 }}>
+      <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
       <circle
-        cx="24" cy="24" r={r}
+        cx="32" cy="32" r={r}
         fill="none"
         stroke={color}
-        strokeWidth="4"
+        strokeWidth="5"
         strokeDasharray={`${circ}`}
         strokeDashoffset={`${offset}`}
         strokeLinecap="round"
-        transform="rotate(-90 24 24)"
+        transform="rotate(-90 32 32)"
       />
       <text
-        x="24" y="24"
+        x="32" y="32"
         textAnchor="middle"
         dominantBaseline="central"
         fill={color}
-        fontSize="11"
+        fontSize="14"
         fontWeight="700"
         fontFamily="monospace"
       >
@@ -159,17 +172,19 @@ function TokenCard({
   onToggleStar: () => void;
 }) {
   const changePos = token.change24h >= 0;
+  const cfg = SAFETY_CONFIG[token.safety];
   return (
     <div
       className="token-card"
       style={{
         background: 'var(--surface)',
-        border: '1px solid rgba(255,255,255,0.06)',
+        border: `1px solid ${cfg.border}`,
         borderRadius: 12,
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',
         gap: 14,
+        boxShadow: `0 0 16px ${cfg.glow}`,
       }}
     >
       {/* Top row: icon + symbol/name/badge + donut */}
@@ -224,9 +239,26 @@ function TokenCard({
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 10,
       }}>
-        <span style={{ fontSize: 11, color: 'var(--accent)', opacity: 0.65, cursor: 'pointer' }}>
-          Click for full breakdown
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 11, color: 'var(--accent)', opacity: 0.65, cursor: 'pointer' }}>
+            Click for full breakdown
+          </span>
+          <a
+            href={`https://birdeye.so/token/${token.address}?chain=solana`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: 10,
+              color: 'var(--muted)',
+              fontFamily: 'var(--font-space-mono), monospace',
+              textDecoration: 'none',
+              opacity: 0.7,
+            }}
+            className="birdeye-link"
+          >
+            View on Birdeye
+          </a>
+        </div>
         <button
           onClick={onToggleStar}
           className="star-btn"
@@ -266,13 +298,13 @@ function MarketOverviewBar({ tokens }: { tokens: DisplayToken[] }) {
         display: 'flex',
       }}>
         <div style={{ width: `${safePct}%`, background: '#00ff9d', transition: 'width 0.4s' }} />
-        <div style={{ width: `${cautionPct}%`, background: '#f5c518', transition: 'width 0.4s' }} />
+        <div style={{ width: `${cautionPct}%`, background: '#f5a623', transition: 'width 0.4s' }} />
         <div style={{ width: `${riskyPct}%`, background: '#ff3b6b', transition: 'width 0.4s' }} />
       </div>
       <span style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
         <span style={{ color: '#00ff9d' }}>{safeN} safe</span>
         <span style={{ color: 'var(--muted)' }}> · </span>
-        <span style={{ color: '#f5c518' }}>{cautionN} caution</span>
+        <span style={{ color: '#f5a623' }}>{cautionN} caution</span>
         <span style={{ color: 'var(--muted)' }}> · </span>
         <span style={{ color: '#ff3b6b' }}>{riskyN} risky</span>
       </span>
@@ -284,7 +316,7 @@ function Placeholder({ title, description }: { title: string; description: strin
   return (
     <div
       className="flex flex-col items-center justify-center gap-3 py-24 rounded-lg"
-      style={{ border: '1px dashed rgba(0,255,157,0.15)', background: 'rgba(14,19,24,0.6)' }}
+      style={{ border: '1px dashed rgba(0,255,157,0.15)', background: 'rgba(9,13,18,0.6)' }}
     >
       <p className="text-base font-bold" style={{ fontFamily: 'var(--font-syne), sans-serif', color: 'var(--text)' }}>
         {title}
@@ -351,9 +383,9 @@ export default function Home() {
     return [];
   }, [activeTab, watchlistTokens]);
 
-  const safeCount   = useMemo(() => baseTokens.filter(t => t.safety === 'safe').length, [baseTokens]);
+  const safeCount    = useMemo(() => baseTokens.filter(t => t.safety === 'safe').length, [baseTokens]);
   const cautionCount = useMemo(() => baseTokens.filter(t => t.safety === 'warn').length, [baseTokens]);
-  const riskyCount  = useMemo(() => baseTokens.filter(t => t.safety === 'rug').length, [baseTokens]);
+  const riskyCount   = useMemo(() => baseTokens.filter(t => t.safety === 'rug').length,  [baseTokens]);
 
   const filteredTokens = useMemo(() => {
     return baseTokens
@@ -372,15 +404,16 @@ export default function Home() {
       });
   }, [baseTokens, search, safetyFilter, sortField]);
 
-  const showGrid = activeTab !== 'whales';
+  const isPlaceholderTab = activeTab in PLACEHOLDER_TABS;
+  const showGrid  = (activeTab === 'trending' || activeTab === 'listings' || activeTab === 'watchlist') && !isPlaceholderTab;
   const showEmpty = activeTab === 'watchlist' && baseTokens.length === 0;
 
   return (
     <>
       <style>{`
         :root {
-          --bg: #080b10;
-          --surface: #0e1318;
+          --bg: #04060a;
+          --surface: #090d12;
           --accent: #00ff9d;
           --accent2: #ff3b6b;
           --text: #e8edf2;
@@ -397,8 +430,7 @@ export default function Home() {
 
         .token-card { transition: border-color 0.15s, box-shadow 0.15s; }
         .token-card:hover {
-          border-color: rgba(99,102,241,0.35) !important;
-          box-shadow: 0 0 0 1px rgba(99,102,241,0.15);
+          filter: brightness(1.06);
         }
 
         .star-btn { transition: color 0.15s; }
@@ -407,7 +439,15 @@ export default function Home() {
         .filter-btn { transition: background 0.12s, border-color 0.12s, color 0.12s; }
         .sort-btn   { transition: background 0.12s, border-color 0.12s, color 0.12s; }
 
+        .birdeye-link:hover { color: var(--accent) !important; opacity: 1 !important; }
+
         input[type="text"]:focus { outline: none; border-color: rgba(99,102,241,0.6) !important; }
+
+        .tab-nav-scroll {
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .tab-nav-scroll::-webkit-scrollbar { display: none; }
 
         @media (max-width: 900px) {
           .token-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -487,15 +527,20 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Row 2: safety legend */}
+            {/* Row 2: safety legend with glowing dots */}
             <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
               {[
-                { dot: '#00ff9d', label: 'Safe (70-100)' },
-                { dot: '#f5c518', label: 'Caution (40-69)' },
-                { dot: '#ff3b6b', label: 'Risky (0-39)' },
-              ].map(({ dot, label }) => (
+                { dot: '#00ff9d', glow: '#00ff9d', label: 'Safe (70-100)' },
+                { dot: '#f5a623', glow: '#f5a623', label: 'Caution (40-69)' },
+                { dot: '#ff3b6b', glow: '#ff3b6b', label: 'Risky (0-39)' },
+              ].map(({ dot, glow, label }) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, display: 'inline-block' }} />
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: dot,
+                    display: 'inline-block',
+                    boxShadow: `0 0 8px ${glow}`,
+                  }} />
                   <span style={{ fontSize: 11, color: 'var(--muted)' }}>{label}</span>
                 </div>
               ))}
@@ -508,47 +553,54 @@ export default function Home() {
           background: 'var(--surface)',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
         }}>
-          <div style={{ maxWidth: 1280, margin: '0 auto', padding: '12px 24px', display: 'flex', gap: 8 }}>
-            {TABS.map(tab => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    padding: '7px 18px', borderRadius: 8, cursor: 'pointer',
-                    fontSize: 13, fontWeight: 700,
-                    fontFamily: 'var(--font-syne), sans-serif',
-                    letterSpacing: '0.01em',
-                    background: isActive ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.03)',
-                    border: isActive
-                      ? '1px solid rgba(99,102,241,0.55)'
-                      : '1px solid rgba(255,255,255,0.09)',
-                    color: isActive ? '#a5b4fc' : 'var(--muted)',
-                    transition: 'all 0.12s',
-                  }}
-                >
-                  {tab.label}
-                  {tab.id === 'watchlist' && watchlist.length > 0 && (
-                    <span style={{
-                      marginLeft: 6, fontSize: 10, fontWeight: 700,
-                      background: 'rgba(99,102,241,0.35)',
-                      color: '#a5b4fc', padding: '1px 5px', borderRadius: 10,
-                    }}>
-                      {watchlist.length}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <div className="tab-nav-scroll" style={{ maxWidth: 1280, margin: '0 auto' }}>
+            <div style={{ padding: '12px 24px', display: 'flex', gap: 8, width: 'max-content', minWidth: '100%' }}>
+              {TABS.map(tab => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      padding: '7px 18px', borderRadius: 8, cursor: 'pointer',
+                      fontSize: 13, fontWeight: 700,
+                      fontFamily: 'var(--font-syne), sans-serif',
+                      letterSpacing: '0.01em',
+                      whiteSpace: 'nowrap',
+                      background: isActive ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.03)',
+                      border: isActive
+                        ? '1px solid rgba(99,102,241,0.55)'
+                        : '1px solid rgba(255,255,255,0.09)',
+                      color: isActive ? '#a5b4fc' : 'var(--muted)',
+                      transition: 'all 0.12s',
+                    }}
+                  >
+                    {tab.label}
+                    {tab.id === 'watchlist' && watchlist.length > 0 && (
+                      <span style={{
+                        marginLeft: 6, fontSize: 10, fontWeight: 700,
+                        background: 'rgba(99,102,241,0.35)',
+                        color: '#a5b4fc', padding: '1px 5px', borderRadius: 10,
+                      }}>
+                        {watchlist.length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </nav>
 
         {/* ── Main Content ─────────────────────────────────────────────────── */}
         <main style={{ maxWidth: 1280, margin: '0 auto', padding: '24px' }}>
 
-          {activeTab === 'whales' && (
-            <Placeholder title="Whale Tracker" description="Large wallet movements — coming soon." />
+          {/* Coming-soon placeholder tabs */}
+          {isPlaceholderTab && (
+            <Placeholder
+              title={`${PLACEHOLDER_TABS[activeTab]} — coming soon`}
+              description="Real-time data via Birdeye API."
+            />
           )}
 
           {activeTab === 'watchlist' && showEmpty && (
