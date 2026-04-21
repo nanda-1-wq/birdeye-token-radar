@@ -7,7 +7,6 @@ export async function GET() {
   const params = new URLSearchParams({
     sort_by: 'mc',
     sort_type: 'desc',
-    offset: '0',
     limit: '20',
     min_liquidity: '10000',
   });
