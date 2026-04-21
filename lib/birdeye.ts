@@ -130,28 +130,46 @@ export function computeProxyScore(
   liquidity: number,
   marketcap: number,
   priceChange24hPercent: number,
+  volume24h = 0,
 ): number {
-  let score = 50;
+  // No mcap data → neutral caution score (avoids false RUG labels)
+  if (!marketcap) return 30;
+
+  // Hard floor only when liquidity is truly near-zero
+  if (liquidity < 500) return 15;
+
+  const abs = Math.abs(priceChange24hPercent);
+
+  // Micro-cap ($1K–$50K): start at caution but bump to 40 when volume > mcap
+  // (active trading despite tiny cap is a positive signal)
+  const isMicroCap = marketcap > 0 && marketcap < 50_000;
+  if (isMicroCap && volume24h > 0 && volume24h > marketcap) return 40;
+
+  // Start micro-cap memes at caution (35) instead of 50 so the
+  // penalties below don't push them to 0 unfairly
+  let score = isMicroCap ? 35 : 50;
+
+  // Extreme manipulation signal — but score stays >= 20
+  if (abs > 5000) return Math.max(20, score - 20);
 
   // Liquidity: deeper pools = harder to rug
   if (liquidity >= 500_000)       score += 20;
   else if (liquidity >= 100_000)  score += 12;
   else if (liquidity >= 50_000)   score += 6;
   else if (liquidity >= 10_000)   score += 2;
-  else                            score -= 10;
+  else if (liquidity < 1_000)     score -= 8;
 
-  // Market cap: higher = more established
+  // Market cap: higher = more established; missing mcap is neutral
   if (marketcap >= 5_000_000)      score += 15;
   else if (marketcap >= 1_000_000) score += 10;
   else if (marketcap >= 100_000)   score += 5;
-  else if (marketcap < 10_000)     score -= 5;
+  // micro-cap already starts at 35; no further penalty
 
-  // Extreme price pumps are a rug-pull signal
-  const abs = Math.abs(priceChange24hPercent);
-  if (abs > 2000)       score -= 35;
-  else if (abs > 1000)  score -= 20;
-  else if (abs > 500)   score -= 10;
-  else if (abs > 200)   score -= 5;
+  // Extreme price pumps are a rug-pull signal (thresholds raised for memes)
+  if (abs > 2000)       score -= 25;
+  else if (abs > 1000)  score -= 15;
+  else if (abs > 500)   score -= 8;
+  else if (abs > 200)   score -= 3;
 
   return Math.max(0, Math.min(100, score));
 }

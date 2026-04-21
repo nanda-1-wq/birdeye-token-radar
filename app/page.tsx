@@ -13,6 +13,7 @@ type Tab = 'trending' | 'listings' | 'livefeed' | 'whalerader' | 'mememonitor' |
 type Safety = 'safe' | 'warn' | 'rug';
 type SafetyFilter = 'all' | 'safe' | 'caution' | 'risky';
 type SortField = 'safetyScore' | 'mcap' | 'volume24h';
+type WhaleSortField = 'amount' | 'time' | 'token';
 
 interface DisplayToken {
   symbol: string;
@@ -29,6 +30,20 @@ interface DisplayToken {
   liquidity?: number;
   rank?: number;
 }
+
+interface LiveSwap {
+  txHash: string;
+  blockUnixTime: number;
+  side: string;
+  amountUsd: number;
+  tokenSymbol: string;
+  tokenAddress: string;
+  counterSymbol: string;
+  walletAddress: string;
+  source: string;
+}
+
+type LiveFeedSortField = 'amount' | 'time' | 'token';
 
 const FALLBACK_LISTINGS: DisplayToken[] = [
   { symbol: 'BONKAI', name: 'Bonkai', address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsk', price: 0.000042, change24h: 340, mcap: 420000, safety: 'safe', safetyScore: 87, holders: 1240, age: '2h ago', volume24h: 2400000, liquidity: 85000 },
@@ -87,22 +102,33 @@ function formatPrice(price: number): string {
   return price.toFixed(5);
 }
 
-function formatMcap(val: number): string {
+function formatNum(val: number): string {
   if (!val) return '—';
-  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
-  if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`;
-  return `$${val}`;
+  if (val >= 1_000_000_000) return `$${(val / 1_000_000_000).toFixed(2)}B`;
+  if (val >= 1_000_000)     return `$${(val / 1_000_000).toFixed(2)}M`;
+  if (val >= 1_000)         return `$${(val / 1_000).toFixed(1)}K`;
+  return `$${Math.round(val)}`;
 }
 
-function formatVolume(val: number): string {
-  if (!val) return '—';
-  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
-  if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}K`;
-  return `$${val}`;
-}
+const formatMcap   = formatNum;
+const formatVolume = formatNum;
+const formatUsd    = formatNum;
 
 function formatAddress(addr: string): string {
   return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+}
+
+function timeAgoFromUnix(unixTime: number): string {
+  if (!unixTime) return '—';
+  const secs = Math.floor(Date.now() / 1000) - unixTime;
+  if (secs < 60)  return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  return `${Math.floor(secs / 3600)}h ago`;
+}
+
+function formatDex(source: string): string {
+  if (!source) return 'Unknown';
+  return source.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -344,11 +370,77 @@ function Placeholder({ title, description }: { title: string; description: strin
   );
 }
 
-function formatUsd(val: number): string {
-  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
-  if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`;
-  return `$${val.toFixed(0)}`;
+// ─── Live Feed components ─────────────────────────────────────────────────────
+
+function LiveFeedRow({ swap, index }: { swap: LiveSwap; index: number }) {
+  const isBuy = swap.side === 'buy';
+  const sideColor  = isBuy ? '#00ff9d' : '#ff3b6b';
+  const sideBg     = isBuy ? 'rgba(0,255,157,0.12)' : 'rgba(255,59,107,0.12)';
+  const sideBorder = isBuy ? 'rgba(0,255,157,0.35)' : 'rgba(255,59,107,0.35)';
+  const rowBg      = index % 2 === 0 ? 'rgba(255,255,255,0.018)' : 'transparent';
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      padding: '10px 16px',
+      background: rowBg,
+      borderBottom: '1px solid rgba(255,255,255,0.04)',
+      gap: 12,
+      minHeight: 48,
+    }}>
+      {/* LEFT: badge + symbol + pair */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 220px' }}>
+        <span style={{
+          color: sideColor, background: sideBg,
+          border: `1px solid ${sideBorder}`,
+          padding: '2px 8px', borderRadius: 4,
+          fontSize: 10, fontWeight: 700,
+          letterSpacing: '0.08em', flexShrink: 0,
+        }}>
+          {isBuy ? 'BUY' : 'SELL'}
+        </span>
+        <span style={{
+          fontFamily: 'var(--font-syne), sans-serif',
+          fontWeight: 700, fontSize: 14,
+          color: 'var(--text)',
+        }}>
+          {swap.tokenSymbol}
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+          {swap.tokenSymbol}/{swap.counterSymbol}
+        </span>
+      </div>
+
+      {/* MIDDLE: wallet + DEX */}
+      <div style={{ flex: 1, fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-space-mono), monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {swap.walletAddress
+          ? <>{swap.walletAddress.slice(0, 6)}...{swap.walletAddress.slice(-4)}</>
+          : '—'
+        }
+        {swap.source && (
+          <span style={{ opacity: 0.5 }}> · {formatDex(swap.source)}</span>
+        )}
+      </div>
+
+      {/* RIGHT: USD amount + time */}
+      <div style={{ textAlign: 'right', flex: '0 0 auto', minWidth: 100 }}>
+        <div style={{
+          fontFamily: 'var(--font-space-mono), monospace',
+          fontWeight: 700, fontSize: 14,
+          color: sideColor,
+        }}>
+          {swap.amountUsd > 0 ? formatUsd(swap.amountUsd) : '—'}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+          {timeAgoFromUnix(swap.blockUnixTime)}
+        </div>
+      </div>
+    </div>
+  );
 }
+
+// ─── Whale Radar components ───────────────────────────────────────────────────
 
 function WhaleCard({ tx }: { tx: WhaleTx }) {
   const isBuy = tx.side === 'buy';
@@ -449,40 +541,6 @@ function WhaleCard({ tx }: { tx: WhaleTx }) {
   );
 }
 
-function WhaleGrid({ txs, loading }: { txs: WhaleTx[]; loading: boolean }) {
-  if (loading && txs.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--muted)', fontSize: 13 }}>
-        Loading whale transactions...
-      </div>
-    );
-  }
-  if (txs.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--muted)', fontSize: 13,
-        border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10 }}>
-        No whale transactions found.
-      </div>
-    );
-  }
-  return (
-    <div
-      className="token-grid"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 16,
-        opacity: loading ? 0.5 : 1,
-        transition: 'opacity 0.2s',
-      }}
-    >
-      {txs.map((tx, i) => (
-        <WhaleCard key={tx.txHash + i} tx={tx} />
-      ))}
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -491,13 +549,17 @@ export default function Home() {
   const [search, setSearch] = useState('');
   const [safetyFilter, setSafetyFilter] = useState<SafetyFilter>('all');
   const [sortField, setSortField] = useState<SortField>('safetyScore');
+  const [whaleSortField, setWhaleSortField] = useState<WhaleSortField>('amount');
+  const [liveFeedSortField, setLiveFeedSortField] = useState<LiveFeedSortField>('time');
   const [updateTime, setUpdateTime] = useState('');
 
   const [trendingTokens, setTrendingTokens] = useState<DisplayToken[]>(FALLBACK_TRENDING);
   const [listingTokens, setListingTokens] = useState<DisplayToken[]>(FALLBACK_LISTINGS);
-  const [livefeedTokens, setLivefeedTokens] = useState<DisplayToken[]>([]);
+  const [liveSwaps, setLiveSwaps] = useState<LiveSwap[]>([]);
+  const [feedPrices, setFeedPrices] = useState<Record<string, { price: number; change24h: number }>>({});
   const [memeTokens, setMemeTokens] = useState<DisplayToken[]>([]);
   const [livefeedLoading, setLivefeedLoading] = useState(false);
+  const [livefeedUpdatedAt, setLivefeedUpdatedAt] = useState('');
   const [memeLoading, setMemeLoading] = useState(false);
   const [whaleTxs, setWhaleTxs] = useState<WhaleTx[]>([]);
   const [whaleLoading, setWhaleLoading] = useState(false);
@@ -517,7 +579,6 @@ export default function Home() {
     const mm = now.getMinutes().toString().padStart(2, '0');
     setUpdateTime(`${hh}:${mm}`);
 
-    // Fetch trending and new listings in parallel
     const [trendingResult, listingsResult] = await Promise.allSettled([
       (async () => { bumpApiCount(1); return getTrending(20); })(),
       (async () => { bumpApiCount(1); return getNewListings(20); })(),
@@ -525,7 +586,7 @@ export default function Home() {
 
     if (trendingResult.status === 'fulfilled') {
       setTrendingTokens(trendingResult.value.map(t => {
-        const score = computeProxyScore(t.liquidity, t.marketcap, t.priceChange24hPercent);
+        const score = computeProxyScore(t.liquidity, t.marketcap, t.priceChange24hPercent, t.volume24hUSD);
         return {
           symbol: t.symbol || '???',
           name: t.name || t.symbol || '???',
@@ -549,7 +610,7 @@ export default function Home() {
 
     if (listingsResult.status === 'fulfilled') {
       setListingTokens(listingsResult.value.map(t => {
-        const score = computeProxyScore(t.liquidity, t.marketcap, t.priceChange24hPercent);
+        const score = computeProxyScore(t.liquidity, t.marketcap, t.priceChange24hPercent, t.volume24hUSD);
         return {
           symbol: t.symbol || '???',
           name: t.name || t.symbol || '???',
@@ -588,29 +649,42 @@ export default function Home() {
 
   const fetchLivefeed = useCallback(async () => {
     setLivefeedLoading(true);
-    bumpApiCount(2);
+    bumpApiCount(3);
     try {
       const res = await fetch('/api/livefeed');
       if (res.ok) {
         const json = await res.json();
-        const items: Record<string, unknown>[] = json?.data?.tokens ?? [];
-        setLivefeedTokens(items.map((t) => {
-          const score = computeProxyScore(Number(t.liquidity ?? 0), Number(t.marketcap ?? 0), Number(t.priceChange24hPercent ?? 0));
-          return {
-            symbol: String(t.symbol || '???'),
-            name: String(t.name || t.symbol || '???'),
-            address: String(t.address ?? ''),
-            price: Number(t.price ?? 0),
-            change24h: Number(t.priceChange24hPercent ?? 0),
-            mcap: Number(t.marketcap ?? 0),
-            safety: mapSecurityToSafety(score),
-            safetyScore: score,
-            holders: 0,
-            age: '',
-            volume24h: Number(t.volume24hUSD ?? 0),
-            liquidity: Number(t.liquidity ?? 0),
-          };
+        const swaps: LiveSwap[] = (json?.swaps ?? []).map((s: Record<string, unknown>) => ({
+          txHash:        String(s.txHash ?? ''),
+          blockUnixTime: Number(s.blockUnixTime ?? 0),
+          side:          String(s.side ?? 'buy'),
+          amountUsd:     Number(s.amountUsd ?? 0),
+          tokenSymbol:   String(s.tokenSymbol ?? ''),
+          tokenAddress:  String(s.tokenAddress ?? ''),
+          counterSymbol: String(s.counterSymbol ?? 'SOL'),
+          walletAddress: String(s.walletAddress ?? ''),
+          source:        String(s.source ?? ''),
         }));
+        setLiveSwaps(swaps);
+        const now = new Date();
+        setLivefeedUpdatedAt(`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`);
+
+        // Fetch prices for unique token addresses in the feed
+        const uniqueAddresses = [...new Set(
+          swaps
+            .map(s => s.tokenAddress)
+            .filter(a => a && a.length > 10)
+        )].slice(0, 10);
+        if (uniqueAddresses.length > 0) {
+          try {
+            bumpApiCount(1);
+            const priceRes = await fetch(`/api/token-info?addresses=${uniqueAddresses.join(',')}`);
+            if (priceRes.ok) {
+              const priceJson = await priceRes.json();
+              setFeedPrices(priceJson.data ?? {});
+            }
+          } catch {}
+        }
       }
     } catch {}
     setLivefeedLoading(false);
@@ -625,7 +699,12 @@ export default function Home() {
         const json = await res.json();
         const items: Record<string, unknown>[] = json?.data?.tokens ?? [];
         setMemeTokens(items.map((t) => {
-          const score = computeProxyScore(Number(t.liquidity ?? 0), Number(t.marketcap ?? 0), Number(t.priceChange24hPercent ?? 0));
+          const score = computeProxyScore(
+            Number(t.liquidity ?? 0),
+            Number(t.marketcap ?? 0),
+            Number(t.priceChange24hPercent ?? 0),
+            Number(t.volume24hUSD ?? 0),
+          );
           return {
             symbol: String(t.symbol || '???'),
             name: String(t.name || t.symbol || '???'),
@@ -662,7 +741,6 @@ export default function Home() {
     fetchMemes();
   }, [fetchAllData, fetchWhales, fetchLivefeed, fetchMemes]);
 
-  // Auto-refresh every 60 seconds (trending/listings) and 30s (whales)
   useEffect(() => {
     const id = setInterval(fetchAllData, 60_000);
     return () => clearInterval(id);
@@ -711,13 +789,12 @@ export default function Home() {
   );
 
   const baseTokens: DisplayToken[] = useMemo(() => {
-    if (activeTab === 'listings') return listingTokens;
-    if (activeTab === 'trending') return trendingTokens;
-    if (activeTab === 'livefeed') return livefeedTokens;
+    if (activeTab === 'listings')    return listingTokens;
+    if (activeTab === 'trending')    return trendingTokens;
     if (activeTab === 'mememonitor') return memeTokens;
-    if (activeTab === 'watchlist') return watchlistTokens;
+    if (activeTab === 'watchlist')   return watchlistTokens;
     return [];
-  }, [activeTab, listingTokens, trendingTokens, livefeedTokens, memeTokens, watchlistTokens]);
+  }, [activeTab, listingTokens, trendingTokens, memeTokens, watchlistTokens]);
 
   const safeCount    = useMemo(() => baseTokens.filter(t => t.safety === 'safe').length, [baseTokens]);
   const cautionCount = useMemo(() => baseTokens.filter(t => t.safety === 'warn').length, [baseTokens]);
@@ -740,12 +817,84 @@ export default function Home() {
       });
   }, [baseTokens, search, safetyFilter, sortField]);
 
+  // Live feed filtering
+  const liveFeedBuyCount  = useMemo(() => liveSwaps.filter(s => s.side === 'buy').length,  [liveSwaps]);
+  const liveFeedSellCount = useMemo(() => liveSwaps.filter(s => s.side !== 'buy').length, [liveSwaps]);
+
+  const filteredLiveSwaps = useMemo(() => {
+    return liveSwaps
+      .filter(s => {
+        const q = search.trim().toLowerCase();
+        if (q && !s.tokenSymbol.toLowerCase().includes(q) && !s.walletAddress.toLowerCase().includes(q)) return false;
+        if (safetyFilter === 'safe'    && s.side !== 'buy') return false;
+        if (safetyFilter === 'caution' && s.side === 'buy') return false;
+        return true;
+      })
+      .sort((a, b) => {
+        if (liveFeedSortField === 'amount') return b.amountUsd - a.amountUsd;
+        if (liveFeedSortField === 'token')  return a.tokenSymbol.localeCompare(b.tokenSymbol);
+        return b.blockUnixTime - a.blockUnixTime; // 'time'
+      });
+  }, [liveSwaps, search, safetyFilter, liveFeedSortField]);
+
+  // Top 6 unique tokens in the feed — look up in allKnown first, then feedPrices, then stub
+  const feedTokenCards = useMemo((): DisplayToken[] => {
+    const seen = new Set<string>();
+    const unique: LiveSwap[] = [];
+    for (const s of liveSwaps) {
+      if (s.tokenSymbol && s.tokenSymbol !== 'SOL' && s.tokenSymbol !== '???' && !seen.has(s.tokenSymbol)) {
+        seen.add(s.tokenSymbol);
+        unique.push(s);
+        if (unique.length >= 6) break;
+      }
+    }
+    return unique.map(s => {
+      const known = allKnown.find(t => t.symbol === s.tokenSymbol || t.address === s.tokenAddress);
+      if (known) return known;
+      const priceData = feedPrices[s.tokenAddress];
+      const score = 30;
+      return {
+        symbol:      s.tokenSymbol,
+        name:        s.tokenSymbol,
+        address:     s.tokenAddress || s.tokenSymbol,
+        price:       priceData?.price ?? 0,
+        change24h:   priceData?.change24h ?? 0,
+        mcap:        0,
+        safety:      mapSecurityToSafety(score) as Safety,
+        safetyScore: score,
+        holders:     0,
+        age:         '',
+        volume24h:   0,
+      };
+    });
+  }, [liveSwaps, allKnown, feedPrices]);
+
+  // Whale radar filtering
+  const whaleSafeCount    = useMemo(() => whaleTxs.filter(t => t.side === 'buy').length,  [whaleTxs]);
+  const whaleCautionCount = useMemo(() => whaleTxs.filter(t => t.side !== 'buy').length,  [whaleTxs]);
+
+  const filteredWhaleTxs = useMemo(() => {
+    return whaleTxs
+      .filter(tx => {
+        const q = search.trim().toLowerCase();
+        if (q && !tx.tokenSymbol.toLowerCase().includes(q) && !tx.walletAddress.toLowerCase().includes(q)) return false;
+        if (safetyFilter === 'safe'    && tx.side !== 'buy') return false;
+        if (safetyFilter === 'caution' && tx.side === 'buy') return false;
+        if (safetyFilter === 'risky')  return false; // no rug-risk concept for whales
+        return true;
+      })
+      .sort((a, b) => {
+        if (whaleSortField === 'amount') return b.amountUsd - a.amountUsd;
+        if (whaleSortField === 'token')  return a.tokenSymbol.localeCompare(b.tokenSymbol);
+        return 0; // 'time' — already sorted by server
+      });
+  }, [whaleTxs, search, safetyFilter, whaleSortField]);
+
   const isPlaceholderTab = activeTab in PLACEHOLDER_TABS;
-  const TOKEN_GRID_TABS: Tab[] = ['trending', 'listings', 'livefeed', 'mememonitor', 'watchlist'];
+  const TOKEN_GRID_TABS: Tab[] = ['trending', 'listings', 'mememonitor', 'watchlist'];
   const showGrid  = TOKEN_GRID_TABS.includes(activeTab) && !isPlaceholderTab;
   const showEmpty = activeTab === 'watchlist' && baseTokens.length === 0;
   const isTabLoading =
-    (activeTab === 'livefeed' && livefeedLoading) ||
     (activeTab === 'mememonitor' && memeLoading) ||
     (activeTab === 'trending' && loading) ||
     (activeTab === 'listings' && loading);
@@ -791,6 +940,8 @@ export default function Home() {
         }
         .tab-nav-scroll::-webkit-scrollbar { display: none; }
 
+        .live-feed-row:hover { background: rgba(255,255,255,0.04) !important; }
+
         @media (max-width: 900px) {
           .token-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
@@ -833,7 +984,6 @@ export default function Home() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {/* API call counter */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '5px 10px', borderRadius: 6,
@@ -846,14 +996,12 @@ export default function Home() {
                   <span style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 700 }}>{apiCallCount} API calls</span>
                 </div>
 
-                {/* Updated time */}
                 {updateTime && (
                   <span style={{ fontSize: 11, color: 'var(--muted)' }}>
                     Updated {updateTime}
                   </span>
                 )}
 
-                {/* Refresh button */}
                 <button
                   onClick={fetchAllData}
                   disabled={loading}
@@ -871,7 +1019,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Row 2: safety legend with glowing dots */}
+            {/* Row 2: safety legend */}
             <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
               {[
                 { dot: '#00ff9d', glow: '#00ff9d', label: 'Safe (70-100)' },
@@ -919,7 +1067,15 @@ export default function Home() {
                       transition: 'all 0.12s',
                     }}
                   >
-                    {tab.label}
+                    {tab.id === 'livefeed' ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="live-dot" style={{
+                          display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+                          background: '#00ff9d', boxShadow: '0 0 6px #00ff9d',
+                        }} />
+                        {tab.label}
+                      </span>
+                    ) : tab.label}
                     {tab.id === 'watchlist' && watchlist.length > 0 && (
                       <span style={{
                         marginLeft: 6, fontSize: 10, fontWeight: 700,
@@ -939,7 +1095,217 @@ export default function Home() {
         {/* ── Main Content ─────────────────────────────────────────────────── */}
         <main style={{ maxWidth: 1280, margin: '0 auto', padding: '24px' }}>
 
-          {/* Whale Radar tab */}
+          {/* ── Live Feed tab ─────────────────────────────────────────────── */}
+          {activeTab === 'livefeed' && (
+            <>
+              {/* Tab header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="live-dot" style={{
+                    display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                    background: '#00ff9d', boxShadow: '0 0 8px #00ff9d', flexShrink: 0,
+                  }} />
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
+                      Live Feed
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      Real-time swaps — SOL · JUP · BONK — refreshes every 15s
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {livefeedUpdatedAt && (
+                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                      Last updated: {livefeedUpdatedAt}
+                    </span>
+                  )}
+                  <button
+                    onClick={fetchLivefeed}
+                    disabled={livefeedLoading}
+                    style={{
+                      padding: '5px 12px', borderRadius: 6, cursor: livefeedLoading ? 'not-allowed' : 'pointer',
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      color: livefeedLoading ? 'var(--muted)' : 'var(--text)', fontSize: 11, fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      fontFamily: 'var(--font-space-mono), monospace',
+                    }}
+                  >
+                    {livefeedLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter bar */}
+              <div style={{ marginBottom: 16 }}>
+                <input
+                  type="text"
+                  placeholder="Filter by token or wallet..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{
+                    width: '100%', padding: '9px 14px',
+                    borderRadius: 8, marginBottom: 10,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    color: 'var(--text)', fontSize: 13,
+                    fontFamily: 'var(--font-space-mono), monospace',
+                  }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  {/* Buy/Sell filter */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {([
+                      { id: 'all',     label: 'All',  count: liveSwaps.length },
+                      { id: 'safe',    label: 'Buy',  count: liveFeedBuyCount },
+                      { id: 'caution', label: 'Sell', count: liveFeedSellCount },
+                    ] as { id: SafetyFilter; label: string; count: number }[]).map(({ id, label, count }) => {
+                      const isActive = safetyFilter === id;
+                      return (
+                        <button key={id} onClick={() => setSafetyFilter(id)} className="filter-btn" style={{
+                          padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                          fontSize: 12, fontWeight: 700,
+                          fontFamily: 'var(--font-space-mono), monospace',
+                          background: isActive ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.03)',
+                          border: isActive ? '1px solid rgba(99,102,241,0.55)' : '1px solid rgba(255,255,255,0.09)',
+                          color: isActive ? '#a5b4fc' : 'var(--muted)',
+                          display: 'flex', alignItems: 'center', gap: 6,
+                        }}>
+                          {label}
+                          <span style={{
+                            fontSize: 10, padding: '1px 5px', borderRadius: 8,
+                            background: isActive ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.07)',
+                            color: isActive ? '#c7d2fe' : 'var(--muted)',
+                          }}>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Sort */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em', marginRight: 4 }}>SORT</span>
+                    {([
+                      { id: 'time',   label: 'Time'   },
+                      { id: 'amount', label: 'Amount' },
+                      { id: 'token',  label: 'Token'  },
+                    ] as { id: LiveFeedSortField; label: string }[]).map(({ id, label }) => {
+                      const isActive = liveFeedSortField === id;
+                      return (
+                        <button key={id} onClick={() => setLiveFeedSortField(id)} className="sort-btn" style={{
+                          padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                          fontSize: 11, fontWeight: 700,
+                          fontFamily: 'var(--font-space-mono), monospace',
+                          background: isActive ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.03)',
+                          border: isActive ? '1px solid rgba(99,102,241,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                          color: isActive ? '#a5b4fc' : 'var(--muted)',
+                        }}>{label}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Market Overview bar */}
+              {liveSwaps.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                  <span style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.12em', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
+                    Market Overview
+                  </span>
+                  <div style={{
+                    flex: 1, height: 6, borderRadius: 3, overflow: 'hidden',
+                    background: 'rgba(255,255,255,0.05)', display: 'flex',
+                  }}>
+                    <div style={{ width: `${(liveFeedBuyCount / liveSwaps.length) * 100}%`, background: '#00ff9d', transition: 'width 0.4s' }} />
+                    <div style={{ width: `${(liveFeedSellCount / liveSwaps.length) * 100}%`, background: '#ff3b6b', transition: 'width 0.4s' }} />
+                  </div>
+                  <span style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+                    <span style={{ color: '#00ff9d' }}>{liveFeedBuyCount} buy</span>
+                    <span style={{ color: 'var(--muted)' }}> · </span>
+                    <span style={{ color: '#ff3b6b' }}>{liveFeedSellCount} sell</span>
+                  </span>
+                </div>
+              )}
+
+              {/* Ticker table */}
+              {livefeedLoading && liveSwaps.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--muted)', fontSize: 13 }}>
+                  Fetching live swaps...
+                </div>
+              ) : liveSwaps.length === 0 ? (
+                <div style={{
+                  textAlign: 'center', padding: '64px 0', color: 'var(--muted)', fontSize: 13,
+                  border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10,
+                }}>
+                  No recent swaps found.
+                </div>
+              ) : (
+                <div style={{
+                  background: 'var(--surface)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  opacity: livefeedLoading ? 0.6 : 1,
+                  transition: 'opacity 0.2s',
+                  marginBottom: 32,
+                }}>
+                  {/* Column headers */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center',
+                    padding: '8px 16px',
+                    borderBottom: '1px solid rgba(255,255,255,0.07)',
+                    background: 'rgba(255,255,255,0.03)',
+                  }}>
+                    <span style={{ flex: '0 0 220px', fontSize: 9, color: 'var(--muted)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Token / Pair</span>
+                    <span style={{ flex: 1, fontSize: 9, color: 'var(--muted)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Wallet / DEX</span>
+                    <span style={{ flex: '0 0 100px', fontSize: 9, color: 'var(--muted)', letterSpacing: '0.12em', textTransform: 'uppercase', textAlign: 'right' }}>Amount / Time</span>
+                  </div>
+                  {filteredLiveSwaps.length === 0 ? (
+                    <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                      No swaps match your filters.
+                    </div>
+                  ) : filteredLiveSwaps.map((swap, i) => (
+                    <div key={swap.txHash + i} className="live-feed-row">
+                      <LiveFeedRow swap={swap} index={i} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Top Tokens in Feed */}
+              {feedTokenCards.length > 0 && (
+                <>
+                  <div style={{
+                    fontSize: 12, fontWeight: 700, color: 'var(--muted)',
+                    letterSpacing: '0.1em', textTransform: 'uppercase',
+                    marginBottom: 14,
+                    fontFamily: 'var(--font-syne), sans-serif',
+                  }}>
+                    Top Tokens in Feed
+                  </div>
+                  <div
+                    className="token-grid"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: 16,
+                    }}
+                  >
+                    {feedTokenCards.map(token => (
+                      <TokenCard
+                        key={token.address}
+                        token={token}
+                        starred={watchlist.includes(token.address)}
+                        onToggleStar={() => toggleWatchlist(token.address)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* ── Whale Radar tab ───────────────────────────────────────────── */}
           {activeTab === 'whalerader' && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -966,7 +1332,144 @@ export default function Home() {
                   {whaleLoading ? 'Loading...' : 'Refresh'}
                 </button>
               </div>
-              <WhaleGrid txs={whaleTxs} loading={whaleLoading} />
+
+              {/* Filter Bar */}
+              <div style={{ marginBottom: 16 }}>
+                <input
+                  type="text"
+                  placeholder="Filter by token symbol or wallet address..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{
+                    width: '100%', padding: '9px 14px',
+                    borderRadius: 8, marginBottom: 10,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    color: 'var(--text)', fontSize: 13,
+                    fontFamily: 'var(--font-space-mono), monospace',
+                  }}
+                />
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  {/* Safety filter buttons */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {([
+                      { id: 'all',     label: 'All',     count: whaleTxs.length },
+                      { id: 'safe',    label: 'Buy',     count: whaleSafeCount },
+                      { id: 'caution', label: 'Sell',    count: whaleCautionCount },
+                    ] as { id: SafetyFilter; label: string; count: number }[]).map(({ id, label, count }) => {
+                      const isActive = safetyFilter === id;
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => setSafetyFilter(id)}
+                          className="filter-btn"
+                          style={{
+                            padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                            fontSize: 12, fontWeight: 700,
+                            fontFamily: 'var(--font-space-mono), monospace',
+                            background: isActive ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.03)',
+                            border: isActive
+                              ? '1px solid rgba(99,102,241,0.55)'
+                              : '1px solid rgba(255,255,255,0.09)',
+                            color: isActive ? '#a5b4fc' : 'var(--muted)',
+                            display: 'flex', alignItems: 'center', gap: 6,
+                          }}
+                        >
+                          {label}
+                          <span style={{
+                            fontSize: 10, padding: '1px 5px', borderRadius: 8,
+                            background: isActive ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.07)',
+                            color: isActive ? '#c7d2fe' : 'var(--muted)',
+                          }}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Sort buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em', marginRight: 4 }}>SORT</span>
+                    {([
+                      { id: 'amount', label: 'Amount' },
+                      { id: 'time',   label: 'Time'   },
+                      { id: 'token',  label: 'Token'  },
+                    ] as { id: WhaleSortField; label: string }[]).map(({ id, label }) => {
+                      const isActive = whaleSortField === id;
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => setWhaleSortField(id)}
+                          className="sort-btn"
+                          style={{
+                            padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+                            fontSize: 11, fontWeight: 700,
+                            fontFamily: 'var(--font-space-mono), monospace',
+                            background: isActive ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.03)',
+                            border: isActive
+                              ? '1px solid rgba(99,102,241,0.45)'
+                              : '1px solid rgba(255,255,255,0.08)',
+                            color: isActive ? '#a5b4fc' : 'var(--muted)',
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Market Overview Bar (buy=safe, sell=caution) */}
+              {whaleTxs.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                  <span style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.12em', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
+                    Market Overview
+                  </span>
+                  <div style={{
+                    flex: 1, height: 6, borderRadius: 3,
+                    overflow: 'hidden',
+                    background: 'rgba(255,255,255,0.05)',
+                    display: 'flex',
+                  }}>
+                    <div style={{ width: `${(whaleSafeCount / whaleTxs.length) * 100}%`, background: '#00ff9d', transition: 'width 0.4s' }} />
+                    <div style={{ width: `${(whaleCautionCount / whaleTxs.length) * 100}%`, background: '#f5a623', transition: 'width 0.4s' }} />
+                  </div>
+                  <span style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+                    <span style={{ color: '#00ff9d' }}>{whaleSafeCount} buy</span>
+                    <span style={{ color: 'var(--muted)' }}> · </span>
+                    <span style={{ color: '#f5a623' }}>{whaleCautionCount} sell</span>
+                  </span>
+                </div>
+              )}
+
+              {whaleLoading && filteredWhaleTxs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--muted)', fontSize: 13 }}>
+                  Loading whale transactions...
+                </div>
+              ) : filteredWhaleTxs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--muted)', fontSize: 13,
+                  border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10 }}>
+                  {whaleTxs.length === 0 ? 'No whale transactions found.' : 'No transactions match your filters.'}
+                </div>
+              ) : (
+                <div
+                  className="token-grid"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 16,
+                    opacity: whaleLoading ? 0.5 : 1,
+                    transition: 'opacity 0.2s',
+                  }}
+                >
+                  {filteredWhaleTxs.map((tx, i) => (
+                    <WhaleCard key={tx.txHash + i} tx={tx} />
+                  ))}
+                </div>
+              )}
             </>
           )}
 
@@ -986,7 +1489,6 @@ export default function Home() {
             <>
               {/* Filter Bar */}
               <div style={{ marginBottom: 16 }}>
-                {/* Search input */}
                 <input
                   type="text"
                   placeholder="Filter by name, symbol or address..."
@@ -1002,9 +1504,7 @@ export default function Home() {
                   }}
                 />
 
-                {/* Filter + Sort row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                  {/* Safety filter buttons */}
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {([
                       { id: 'all',     label: 'All',     count: baseTokens.length },
@@ -1043,7 +1543,6 @@ export default function Home() {
                     })}
                   </div>
 
-                  {/* Sort buttons */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em', marginRight: 4 }}>SORT</span>
                     {([

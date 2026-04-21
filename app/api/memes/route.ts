@@ -10,8 +10,8 @@ export async function GET() {
     sort_type: 'desc',
     offset: '0',
     limit: '50',
-    min_liquidity: '1000',
-    max_liquidity: '500000',
+    min_liquidity: '500',
+    max_liquidity: '100000',
   });
 
   const res = await fetch(`${BASE_URL}/defi/tokenlist?${params}`, {
@@ -41,13 +41,13 @@ export async function GET() {
       liquidity: Number(item.liquidity ?? 0),
       marketcap: Number(item.mc ?? item.marketcap ?? 0),
     }))
-    .filter(
-      (t) =>
-        t.priceChange24hPercent > 20 &&
-        t.liquidity < 500_000 &&
-        t.price < 0.01 &&
-        t.address,
-    )
+    .filter((t) => {
+      const hasPump =
+        t.address.toLowerCase().endsWith('pump') ||
+        t.name.toLowerCase().includes('pump');
+      const isMicroCap = t.liquidity < 100_000;
+      return t.address && t.priceChange24hPercent > 50 && t.liquidity < 100_000 && (hasPump || isMicroCap);
+    })
     .slice(0, 20);
 
   return NextResponse.json({ data: { tokens: filtered } }, {
