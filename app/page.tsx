@@ -73,10 +73,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 // Tabs that show a coming-soon placeholder
-const PLACEHOLDER_TABS: Partial<Record<Tab, string>> = {
-  smartmoney:  'Smart Money',
-  defipulse:   'DeFi Pulse',
-};
+const PLACEHOLDER_TABS: Partial<Record<Tab, string>> = {};
 
 interface WhaleTx {
   txHash: string;
@@ -558,6 +555,10 @@ export default function Home() {
   const [liveSwaps, setLiveSwaps] = useState<LiveSwap[]>([]);
   const [feedPrices, setFeedPrices] = useState<Record<string, { price: number; change24h: number }>>({});
   const [memeTokens, setMemeTokens] = useState<DisplayToken[]>([]);
+  const [smartMoneyTokens, setSmartMoneyTokens] = useState<DisplayToken[]>([]);
+  const [defiPulseTokens, setDefiPulseTokens] = useState<DisplayToken[]>([]);
+  const [smartMoneyLoading, setSmartMoneyLoading] = useState(false);
+  const [defiPulseLoading, setDefiPulseLoading] = useState(false);
   const [livefeedLoading, setLivefeedLoading] = useState(false);
   const [livefeedUpdatedAt, setLivefeedUpdatedAt] = useState('');
   const [memeLoading, setMemeLoading] = useState(false);
@@ -725,6 +726,76 @@ export default function Home() {
     setMemeLoading(false);
   }, []);
 
+  const fetchSmartMoney = useCallback(async () => {
+    setSmartMoneyLoading(true);
+    bumpApiCount(1);
+    try {
+      const res = await fetch('/api/smartmoney');
+      if (res.ok) {
+        const json = await res.json();
+        const items: Record<string, unknown>[] = json?.data?.tokens ?? [];
+        setSmartMoneyTokens(items.map((t) => {
+          const score = computeProxyScore(
+            Number(t.liquidity ?? 0),
+            Number(t.marketcap ?? 0),
+            Number(t.priceChange24hPercent ?? 0),
+            Number(t.volume24hUSD ?? 0),
+          );
+          return {
+            symbol:      String(t.symbol || '???'),
+            name:        String(t.name || t.symbol || '???'),
+            address:     String(t.address ?? ''),
+            price:       Number(t.price ?? 0),
+            change24h:   Number(t.priceChange24hPercent ?? 0),
+            mcap:        Number(t.marketcap ?? 0),
+            safety:      mapSecurityToSafety(score),
+            safetyScore: score,
+            holders:     0,
+            age:         '',
+            volume24h:   Number(t.volume24hUSD ?? 0),
+            liquidity:   Number(t.liquidity ?? 0),
+          };
+        }));
+      }
+    } catch {}
+    setSmartMoneyLoading(false);
+  }, []);
+
+  const fetchDefiPulse = useCallback(async () => {
+    setDefiPulseLoading(true);
+    bumpApiCount(1);
+    try {
+      const res = await fetch('/api/defipulse');
+      if (res.ok) {
+        const json = await res.json();
+        const items: Record<string, unknown>[] = json?.data?.tokens ?? [];
+        setDefiPulseTokens(items.map((t) => {
+          const score = computeProxyScore(
+            Number(t.liquidity ?? 0),
+            Number(t.marketcap ?? 0),
+            Number(t.priceChange24hPercent ?? 0),
+            Number(t.volume24hUSD ?? 0),
+          );
+          return {
+            symbol:      String(t.symbol || '???'),
+            name:        String(t.name || t.symbol || '???'),
+            address:     String(t.address ?? ''),
+            price:       Number(t.price ?? 0),
+            change24h:   Number(t.priceChange24hPercent ?? 0),
+            mcap:        Number(t.marketcap ?? 0),
+            safety:      mapSecurityToSafety(score),
+            safetyScore: score,
+            holders:     0,
+            age:         '',
+            volume24h:   Number(t.volume24hUSD ?? 0),
+            liquidity:   Number(t.liquidity ?? 0),
+          };
+        }));
+      }
+    } catch {}
+    setDefiPulseLoading(false);
+  }, []);
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('watchlist');
@@ -739,7 +810,9 @@ export default function Home() {
     fetchWhales();
     fetchLivefeed();
     fetchMemes();
-  }, [fetchAllData, fetchWhales, fetchLivefeed, fetchMemes]);
+    fetchSmartMoney();
+    fetchDefiPulse();
+  }, [fetchAllData, fetchWhales, fetchLivefeed, fetchMemes, fetchSmartMoney, fetchDefiPulse]);
 
   useEffect(() => {
     const id = setInterval(fetchAllData, 60_000);
@@ -760,6 +833,16 @@ export default function Home() {
     const id = setInterval(fetchMemes, 20_000);
     return () => clearInterval(id);
   }, [fetchMemes]);
+
+  useEffect(() => {
+    const id = setInterval(fetchSmartMoney, 60_000);
+    return () => clearInterval(id);
+  }, [fetchSmartMoney]);
+
+  useEffect(() => {
+    const id = setInterval(fetchDefiPulse, 60_000);
+    return () => clearInterval(id);
+  }, [fetchDefiPulse]);
 
   // Reset filters on tab switch
   useEffect(() => {
@@ -792,9 +875,11 @@ export default function Home() {
     if (activeTab === 'listings')    return listingTokens;
     if (activeTab === 'trending')    return trendingTokens;
     if (activeTab === 'mememonitor') return memeTokens;
+    if (activeTab === 'smartmoney')  return smartMoneyTokens;
+    if (activeTab === 'defipulse')   return defiPulseTokens;
     if (activeTab === 'watchlist')   return watchlistTokens;
     return [];
-  }, [activeTab, listingTokens, trendingTokens, memeTokens, watchlistTokens]);
+  }, [activeTab, listingTokens, trendingTokens, memeTokens, smartMoneyTokens, defiPulseTokens, watchlistTokens]);
 
   const safeCount    = useMemo(() => baseTokens.filter(t => t.safety === 'safe').length, [baseTokens]);
   const cautionCount = useMemo(() => baseTokens.filter(t => t.safety === 'warn').length, [baseTokens]);
@@ -891,11 +976,13 @@ export default function Home() {
   }, [whaleTxs, search, safetyFilter, whaleSortField]);
 
   const isPlaceholderTab = activeTab in PLACEHOLDER_TABS;
-  const TOKEN_GRID_TABS: Tab[] = ['trending', 'listings', 'mememonitor', 'watchlist'];
+  const TOKEN_GRID_TABS: Tab[] = ['trending', 'listings', 'mememonitor', 'smartmoney', 'defipulse', 'watchlist'];
   const showGrid  = TOKEN_GRID_TABS.includes(activeTab) && !isPlaceholderTab;
   const showEmpty = activeTab === 'watchlist' && baseTokens.length === 0;
   const isTabLoading =
     (activeTab === 'mememonitor' && memeLoading) ||
+    (activeTab === 'smartmoney'  && smartMoneyLoading) ||
+    (activeTab === 'defipulse'   && defiPulseLoading) ||
     (activeTab === 'trending' && loading) ||
     (activeTab === 'listings' && loading);
 
