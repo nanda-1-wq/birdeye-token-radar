@@ -352,7 +352,106 @@ function formatUsd(val: number): string {
   return `$${val.toFixed(0)}`;
 }
 
-function WhaleTable({ txs, loading }: { txs: WhaleTx[]; loading: boolean }) {
+function WhaleCard({ tx }: { tx: WhaleTx }) {
+  const isBuy = tx.side === 'buy';
+  const sideColor  = isBuy ? '#00ff9d' : '#ff3b6b';
+  const sideBg     = isBuy ? 'rgba(0,255,157,0.10)'  : 'rgba(255,59,107,0.10)';
+  const sideBorder = isBuy ? 'rgba(0,255,157,0.40)'  : 'rgba(255,59,107,0.40)';
+  const cardGlow   = isBuy ? 'rgba(0,255,157,0.13)'  : 'rgba(255,59,107,0.13)';
+  const dexLabel   = tx.dex.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  const palette = ['#6366f1','#8b5cf6','#0ea5e9','#f59e0b','#10b981','#ef4444','#f97316','#ec4899'];
+  const sym = tx.tokenSymbol || '?';
+  const idx = (sym.charCodeAt(0) + sym.charCodeAt(sym.length - 1)) % palette.length;
+
+  return (
+    <div
+      className="token-card"
+      style={{
+        background: 'var(--surface)',
+        border: `1px solid ${sideBorder}`,
+        borderRadius: 12,
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+        boxShadow: `0 0 16px ${cardGlow}`,
+      }}
+    >
+      {/* Top row: icon + symbol + buy/sell badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: '50%',
+          background: palette[idx],
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 15, fontWeight: 700, color: '#fff', flexShrink: 0,
+          fontFamily: 'var(--font-syne), sans-serif',
+        }}>
+          {sym[0]}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{
+              fontFamily: 'var(--font-syne), sans-serif',
+              fontWeight: 700, fontSize: 15, color: 'var(--text)',
+            }}>
+              {sym}
+            </span>
+            <span style={{
+              color: sideColor, background: sideBg, border: `1px solid ${sideBorder}`,
+              padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+              letterSpacing: '0.06em', whiteSpace: 'nowrap', lineHeight: 1.6,
+            }}>
+              {isBuy ? 'BUY' : 'SELL'}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+            {tx.tokenSymbol}/{tx.counterSymbol}
+          </div>
+        </div>
+      </div>
+
+      {/* Large USD amount */}
+      <div style={{
+        fontSize: 26, fontWeight: 700,
+        color: sideColor,
+        fontFamily: 'var(--font-space-mono), monospace',
+      }}>
+        {formatUsd(tx.amountUsd)}
+      </div>
+
+      {/* 2x2 data grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 8px' }}>
+        <div>
+          <div style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 3 }}>DEX</div>
+          <div style={{ fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font-space-mono), monospace' }}>{dexLabel || '—'}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 3 }}>PAIR</div>
+          <div style={{ fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font-space-mono), monospace' }}>{tx.tokenSymbol}/{tx.counterSymbol}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 3 }}>WALLET</div>
+          <a
+            href={`https://solscan.io/account/${tx.walletAddress}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 13, color: 'var(--muted)', fontFamily: 'var(--font-space-mono), monospace', textDecoration: 'none' }}
+            className="birdeye-link"
+          >
+            {tx.walletAddress.slice(0, 4)}...{tx.walletAddress.slice(-4)}
+          </a>
+        </div>
+        <div>
+          <div style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 3 }}>TIME</div>
+          <div style={{ fontSize: 13, color: 'var(--text)', fontFamily: 'var(--font-space-mono), monospace' }}>{tx.timeAgo}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WhaleGrid({ txs, loading }: { txs: WhaleTx[]; loading: boolean }) {
   if (loading && txs.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--muted)', fontSize: 13 }}>
@@ -368,106 +467,20 @@ function WhaleTable({ txs, loading }: { txs: WhaleTx[]; loading: boolean }) {
       </div>
     );
   }
-
-  const COL_WIDTHS = ['90px', '80px', '1fr', '140px', '110px', '120px', '80px'];
-
   return (
-    <div style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
-      {/* Header row */}
-      <div style={{
+    <div
+      className="token-grid"
+      style={{
         display: 'grid',
-        gridTemplateColumns: COL_WIDTHS.join(' '),
-        gap: '0 16px',
-        padding: '8px 16px',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
-        marginBottom: 4,
-      }}>
-        {['SIDE', 'TOKEN', 'WALLET', 'AMOUNT', 'DEX', 'PAIR', 'TIME'].map(h => (
-          <span key={h} style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.10em', fontWeight: 700 }}>
-            {h}
-          </span>
-        ))}
-      </div>
-
-      {/* Data rows */}
-      {txs.map((tx, i) => {
-        const isBuy = tx.side === 'buy';
-        const sideColor = isBuy ? '#00ff9d' : '#ff3b6b';
-        const sideBg    = isBuy ? 'rgba(0,255,157,0.10)' : 'rgba(255,59,107,0.10)';
-        const sideBorder= isBuy ? 'rgba(0,255,157,0.30)' : 'rgba(255,59,107,0.30)';
-        const dexLabel  = tx.dex.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-        return (
-          <div
-            key={tx.txHash + i}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: COL_WIDTHS.join(' '),
-              gap: '0 16px',
-              padding: '12px 16px',
-              borderBottom: '1px solid rgba(255,255,255,0.04)',
-              alignItems: 'center',
-              transition: 'background 0.1s',
-            }}
-            className="whale-row"
-          >
-            {/* Side badge */}
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              padding: '3px 8px', borderRadius: 4,
-              background: sideBg, border: `1px solid ${sideBorder}`,
-              color: sideColor, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-              width: 'fit-content',
-            }}>
-              {isBuy ? 'BUY' : 'SELL'}
-            </span>
-
-            {/* Token symbol */}
-            <span style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
-              {tx.tokenSymbol}
-            </span>
-
-            {/* Wallet */}
-            <a
-              href={`https://solscan.io/account/${tx.walletAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontFamily: 'var(--font-space-mono), monospace',
-                fontSize: 12, color: 'var(--muted)', textDecoration: 'none',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}
-              className="whale-wallet-link"
-            >
-              {tx.walletAddress.slice(0, 4)}...{tx.walletAddress.slice(-4)}
-            </a>
-
-            {/* Amount */}
-            <span style={{
-              fontFamily: 'var(--font-space-mono), monospace',
-              fontSize: 14, fontWeight: 700,
-              color: isBuy ? '#00ff9d' : '#ff3b6b',
-            }}>
-              {formatUsd(tx.amountUsd)}
-            </span>
-
-            {/* DEX */}
-            <span style={{ fontSize: 12, color: '#a5b4fc' }}>
-              {dexLabel}
-            </span>
-
-            {/* Pair */}
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-              {tx.tokenSymbol}/{tx.counterSymbol}
-            </span>
-
-            {/* Time */}
-            <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-              {tx.timeAgo}
-            </span>
-          </div>
-        );
-      })}
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 16,
+        opacity: loading ? 0.5 : 1,
+        transition: 'opacity 0.2s',
+      }}
+    >
+      {txs.map((tx, i) => (
+        <WhaleCard key={tx.txHash + i} tx={tx} />
+      ))}
     </div>
   );
 }
@@ -687,8 +700,6 @@ export default function Home() {
         .sort-btn   { transition: background 0.12s, border-color 0.12s, color 0.12s; }
 
         .birdeye-link:hover { color: var(--accent) !important; opacity: 1 !important; }
-        .whale-row:hover { background: rgba(255,255,255,0.025); }
-        .whale-wallet-link:hover { color: var(--accent) !important; }
 
         input[type="text"]:focus { outline: none; border-color: rgba(99,102,241,0.6) !important; }
 
@@ -873,14 +884,7 @@ export default function Home() {
                   {whaleLoading ? 'Loading...' : 'Refresh'}
                 </button>
               </div>
-              <div style={{
-                background: 'var(--surface)',
-                border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: 12,
-                overflow: 'hidden',
-              }}>
-                <WhaleTable txs={whaleTxs} loading={whaleLoading} />
-              </div>
+              <WhaleGrid txs={whaleTxs} loading={whaleLoading} />
             </>
           )}
 
