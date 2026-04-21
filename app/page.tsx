@@ -1,6 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  getTrending,
+  getNewListings,
+  mapSecurityToSafety,
+  computeProxyScore,
+  tokenAge,
+} from '@/lib/birdeye';
 
 type Tab = 'trending' | 'listings' | 'livefeed' | 'whalerader' | 'mememonitor' | 'smartmoney' | 'defipulse' | 'watchlist';
 type Safety = 'safe' | 'warn' | 'rug';
@@ -23,7 +30,7 @@ interface DisplayToken {
   rank?: number;
 }
 
-const MOCK_LISTINGS: DisplayToken[] = [
+const FALLBACK_LISTINGS: DisplayToken[] = [
   { symbol: 'BONKAI', name: 'Bonkai', address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsk', price: 0.000042, change24h: 340, mcap: 420000, safety: 'safe', safetyScore: 87, holders: 1240, age: '2h ago', volume24h: 2400000, liquidity: 85000 },
   { symbol: 'PEPE2', name: 'PepeSol', address: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', price: 0.0000091, change24h: 88, mcap: 180000, safety: 'warn', safetyScore: 45, holders: 430, age: '5h ago', volume24h: 320000, liquidity: 42000 },
   { symbol: 'RUGBAIT', name: 'RugBait', address: 'So11111111111111111111111111111111111111112', price: 0.0000001, change24h: 2100, mcap: 9000, safety: 'rug', safetyScore: 8, holders: 12, age: '1h ago', volume24h: 18000 },
@@ -31,7 +38,7 @@ const MOCK_LISTINGS: DisplayToken[] = [
   { symbol: 'MGDOG', name: 'MegaDog', address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', price: 0.00012, change24h: -12, mcap: 120000, safety: 'warn', safetyScore: 51, holders: 680, age: '12h ago', volume24h: 85000, liquidity: 28000 },
 ];
 
-const MOCK_TRENDING: DisplayToken[] = [
+const FALLBACK_TRENDING: DisplayToken[] = [
   { symbol: 'BONKAI', name: 'Bonkai', address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsk', price: 0.000042, change24h: 340, mcap: 420000, safety: 'safe', safetyScore: 87, holders: 1240, age: '', volume24h: 2400000, liquidity: 85000, rank: 1 },
   { symbol: 'WIFM', name: 'WifMoon', address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', price: 0.00089, change24h: 55, mcap: 890000, safety: 'safe', safetyScore: 82, holders: 3200, age: '', volume24h: 1100000, liquidity: 220000, rank: 2 },
   { symbol: 'SPELPE', name: 'SolPepe', address: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', price: 0.000034, change24h: 180, mcap: 340000, safety: 'warn', safetyScore: 61, holders: 890, age: '', volume24h: 880000, liquidity: 65000, rank: 3 },
@@ -338,6 +345,80 @@ export default function Home() {
   const [sortField, setSortField] = useState<SortField>('safetyScore');
   const [updateTime, setUpdateTime] = useState('');
 
+  const [trendingTokens, setTrendingTokens] = useState<DisplayToken[]>(FALLBACK_TRENDING);
+  const [listingTokens, setListingTokens] = useState<DisplayToken[]>(FALLBACK_LISTINGS);
+  const [loading, setLoading] = useState(false);
+  const [apiCallCount, setApiCallCount] = useState(0);
+  const apiCallRef = useRef(0);
+
+  function bumpApiCount(n = 1) {
+    apiCallRef.current += n;
+    setApiCallCount(apiCallRef.current);
+  }
+
+  const fetchAllData = useCallback(async () => {
+    setLoading(true);
+    const now = new Date();
+    const hh = now.getHours().toString().padStart(2, '0');
+    const mm = now.getMinutes().toString().padStart(2, '0');
+    setUpdateTime(`${hh}:${mm}`);
+
+    // Fetch trending and new listings in parallel
+    const [trendingResult, listingsResult] = await Promise.allSettled([
+      (async () => { bumpApiCount(1); return getTrending(20); })(),
+      (async () => { bumpApiCount(1); return getNewListings(20); })(),
+    ]);
+
+    if (trendingResult.status === 'fulfilled') {
+      setTrendingTokens(trendingResult.value.map(t => {
+        const score = computeProxyScore(t.liquidity, t.marketcap, t.priceChange24hPercent);
+        return {
+          symbol: t.symbol || '???',
+          name: t.name || t.symbol || '???',
+          address: t.address,
+          price: t.price,
+          change24h: t.priceChange24hPercent,
+          mcap: t.marketcap,
+          safety: mapSecurityToSafety(score),
+          safetyScore: score,
+          holders: 0,
+          age: '',
+          volume24h: t.volume24hUSD,
+          liquidity: t.liquidity,
+          rank: t.rank,
+        };
+      }));
+    } else {
+      console.error('getTrending failed, using fallback:', trendingResult.reason);
+      setTrendingTokens(FALLBACK_TRENDING);
+    }
+
+    if (listingsResult.status === 'fulfilled') {
+      setListingTokens(listingsResult.value.map(t => {
+        const score = computeProxyScore(t.liquidity, t.marketcap, t.priceChange24hPercent);
+        return {
+          symbol: t.symbol || '???',
+          name: t.name || t.symbol || '???',
+          address: t.address,
+          price: t.price,
+          change24h: t.priceChange24hPercent,
+          mcap: t.marketcap,
+          safety: mapSecurityToSafety(score),
+          safetyScore: score,
+          holders: 0,
+          age: tokenAge(t.lastTradeUnixTime),
+          volume24h: t.volume24hUSD,
+          liquidity: t.liquidity,
+        };
+      }));
+    } else {
+      console.error('getNewListings failed, using fallback:', listingsResult.reason);
+      setListingTokens(FALLBACK_LISTINGS);
+    }
+
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('watchlist');
@@ -347,7 +428,15 @@ export default function Home() {
     const hh = now.getHours().toString().padStart(2, '0');
     const mm = now.getMinutes().toString().padStart(2, '0');
     setUpdateTime(`${hh}:${mm}`);
-  }, []);
+
+    fetchAllData();
+  }, [fetchAllData]);
+
+  // Auto-refresh every 60 seconds
+  useEffect(() => {
+    const id = setInterval(fetchAllData, 60_000);
+    return () => clearInterval(id);
+  }, [fetchAllData]);
 
   // Reset filters on tab switch
   useEffect(() => {
@@ -367,9 +456,9 @@ export default function Home() {
 
   const allKnown = useMemo(() => {
     const map = new Map<string, DisplayToken>();
-    [...MOCK_LISTINGS, ...MOCK_TRENDING].forEach(t => map.set(t.address, t));
+    [...listingTokens, ...trendingTokens].forEach(t => map.set(t.address, t));
     return Array.from(map.values());
-  }, []);
+  }, [listingTokens, trendingTokens]);
 
   const watchlistTokens = useMemo(
     () => allKnown.filter(t => watchlist.includes(t.address)),
@@ -377,11 +466,11 @@ export default function Home() {
   );
 
   const baseTokens: DisplayToken[] = useMemo(() => {
-    if (activeTab === 'listings') return MOCK_LISTINGS;
-    if (activeTab === 'trending') return MOCK_TRENDING;
+    if (activeTab === 'listings') return listingTokens;
+    if (activeTab === 'trending') return trendingTokens;
     if (activeTab === 'watchlist') return watchlistTokens;
     return [];
-  }, [activeTab, watchlistTokens]);
+  }, [activeTab, listingTokens, trendingTokens, watchlistTokens]);
 
   const safeCount    = useMemo(() => baseTokens.filter(t => t.safety === 'safe').length, [baseTokens]);
   const cautionCount = useMemo(() => baseTokens.filter(t => t.safety === 'warn').length, [baseTokens]);
@@ -501,7 +590,7 @@ export default function Home() {
                   <span className="live-dot inline-block" style={{
                     width: 6, height: 6, borderRadius: '50%', background: '#6366f1',
                   }} />
-                  <span style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 700 }}>124 API calls</span>
+                  <span style={{ fontSize: 11, color: '#a5b4fc', fontWeight: 700 }}>{apiCallCount} API calls</span>
                 </div>
 
                 {/* Updated time */}
@@ -513,16 +602,18 @@ export default function Home() {
 
                 {/* Refresh button */}
                 <button
+                  onClick={fetchAllData}
+                  disabled={loading}
                   style={{
-                    padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                    padding: '5px 12px', borderRadius: 6, cursor: loading ? 'not-allowed' : 'pointer',
                     background: 'rgba(255,255,255,0.05)',
                     border: '1px solid rgba(255,255,255,0.12)',
-                    color: 'var(--text)', fontSize: 11, fontWeight: 700,
+                    color: loading ? 'var(--muted)' : 'var(--text)', fontSize: 11, fontWeight: 700,
                     letterSpacing: '0.04em',
                     fontFamily: 'var(--font-space-mono), monospace',
                   }}
                 >
-                  Refresh
+                  {loading ? 'Loading...' : 'Refresh'}
                 </button>
               </div>
             </div>
@@ -721,6 +812,8 @@ export default function Home() {
                     display: 'grid',
                     gridTemplateColumns: 'repeat(3, 1fr)',
                     gap: 16,
+                    opacity: loading ? 0.5 : 1,
+                    transition: 'opacity 0.2s',
                   }}
                 >
                   {filteredTokens.map(token => (
