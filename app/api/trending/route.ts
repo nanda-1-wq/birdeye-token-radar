@@ -16,13 +16,19 @@ export async function GET() {
       'x-chain': 'solana',
       'accept': 'application/json',
     },
-    next: { revalidate: 60 },
+    next: { revalidate: 120 },
   });
   if (!res.ok) {
+    const body = await res.text();
+    console.error(`[trending] API error ${res.status}:`, body);
     return NextResponse.json({ error: `Birdeye error: ${res.status}` }, { status: res.status });
   }
   const json = await res.json();
+  if (!json?.success) {
+    console.error(`[trending] Birdeye success=false:`, json?.message ?? JSON.stringify(json));
+    return NextResponse.json({ error: json?.message ?? 'Birdeye error' }, { status: 502 });
+  }
   return NextResponse.json(json, {
-    headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' },
+    headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60' },
   });
 }

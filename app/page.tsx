@@ -837,32 +837,32 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const id = setInterval(fetchAllData, 60_000);
+    const id = setInterval(fetchAllData, 120_000);
     return () => clearInterval(id);
   }, [fetchAllData]);
 
   useEffect(() => {
-    const id = setInterval(fetchWhales, 30_000);
+    const id = setInterval(fetchWhales, 120_000);
     return () => clearInterval(id);
   }, [fetchWhales]);
 
   useEffect(() => {
-    const id = setInterval(fetchLivefeed, 15_000);
+    const id = setInterval(fetchLivefeed, 120_000);
     return () => clearInterval(id);
   }, [fetchLivefeed]);
 
   useEffect(() => {
-    const id = setInterval(fetchMemes, 20_000);
+    const id = setInterval(fetchMemes, 120_000);
     return () => clearInterval(id);
   }, [fetchMemes]);
 
   useEffect(() => {
-    const id = setInterval(fetchSmartMoney, 60_000);
+    const id = setInterval(fetchSmartMoney, 120_000);
     return () => clearInterval(id);
   }, [fetchSmartMoney]);
 
   useEffect(() => {
-    const id = setInterval(fetchDefiPulse, 60_000);
+    const id = setInterval(fetchDefiPulse, 120_000);
     return () => clearInterval(id);
   }, [fetchDefiPulse]);
 

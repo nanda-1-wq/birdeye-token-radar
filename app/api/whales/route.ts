@@ -46,7 +46,7 @@ export async function GET() {
       });
       return fetch(`${BASE_URL}/defi/txs/token?${params}`, {
         headers,
-        next: { revalidate: 30 },
+        next: { revalidate: 120 },
       })
         .then(async r => {
           if (!r.ok) {
@@ -56,6 +56,10 @@ export async function GET() {
           return r.json();
         })
         .then(json => {
+          if (!json?.success) {
+            console.error(`[whales] ${symbol} success=false:`, json?.message ?? JSON.stringify(json));
+            return [] as Record<string, unknown>[];
+          }
           const items: Record<string, unknown>[] = json?.data?.items ?? [];
           return items.map(item => ({ ...item, _trackedSymbol: symbol, _trackedAddress: address }));
         })
@@ -105,6 +109,6 @@ export async function GET() {
     });
 
   return NextResponse.json({ whales }, {
-    headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=15' },
+    headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60' },
   });
 }

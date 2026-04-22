@@ -18,14 +18,20 @@ export async function GET() {
       'x-chain': 'solana',
       'accept': 'application/json',
     },
-    next: { revalidate: 60 },
+    next: { revalidate: 120 },
   });
 
   if (!res.ok) {
-    return NextResponse.json({ error: `Birdeye error: ${res.status}` }, { status: res.status });
+    const body = await res.text();
+    console.error(`[defipulse] API error ${res.status}:`, body);
+    return NextResponse.json({ data: { tokens: [] } });
   }
 
   const json = await res.json();
+  if (!json?.success) {
+    console.error(`[defipulse] Birdeye success=false:`, json?.message ?? JSON.stringify(json));
+    return NextResponse.json({ data: { tokens: [] } });
+  }
   const items: Record<string, unknown>[] = json?.data?.tokens ?? json?.data?.items ?? [];
 
   const tokens = items.map((item) => ({
@@ -40,6 +46,6 @@ export async function GET() {
   }));
 
   return NextResponse.json({ data: { tokens } }, {
-    headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' },
+    headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60' },
   });
 }

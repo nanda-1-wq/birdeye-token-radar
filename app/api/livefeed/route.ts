@@ -33,10 +33,18 @@ export async function GET() {
       });
       const res = await fetch(`${BASE_URL}/defi/txs/token?${params}`, {
         headers: headers(apiKey),
-        next: { revalidate: 10 },
+        next: { revalidate: 120 },
       });
-      if (!res.ok) return [];
+      if (!res.ok) {
+        const body = await res.text();
+        console.error(`[livefeed] ${symbol} API error ${res.status}:`, body);
+        return [];
+      }
       const json = await res.json();
+      if (!json?.success) {
+        console.error(`[livefeed] ${symbol} success=false:`, json?.message ?? JSON.stringify(json));
+        return [];
+      }
       const items: Record<string, unknown>[] = json?.data?.items ?? json?.data ?? [];
 
       return items.map((item) => {
@@ -127,6 +135,6 @@ export async function GET() {
     .slice(0, 30);
 
   return NextResponse.json({ swaps: sorted }, {
-    headers: { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=5' },
+    headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60' },
   });
 }

@@ -19,14 +19,20 @@ export async function GET() {
       'x-chain': 'solana',
       'accept': 'application/json',
     },
-    next: { revalidate: 20 },
+    next: { revalidate: 120 },
   });
 
   if (!res.ok) {
-    return NextResponse.json({ error: `Birdeye error: ${res.status}` }, { status: res.status });
+    const body = await res.text();
+    console.error(`[memes] API error ${res.status}:`, body);
+    return NextResponse.json({ data: { tokens: [] } });
   }
 
   const json = await res.json();
+  if (!json?.success) {
+    console.error(`[memes] Birdeye success=false:`, json?.message ?? JSON.stringify(json));
+    return NextResponse.json({ data: { tokens: [] } });
+  }
   const items: Record<string, unknown>[] = json?.data?.tokens ?? json?.data?.items ?? [];
 
   const filtered = items
@@ -50,6 +56,6 @@ export async function GET() {
     .slice(0, 20);
 
   return NextResponse.json({ data: { tokens: filtered } }, {
-    headers: { 'Cache-Control': 'public, s-maxage=20, stale-while-revalidate=15' },
+    headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=60' },
   });
 }
