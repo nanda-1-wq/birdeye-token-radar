@@ -54,11 +54,16 @@ const FALLBACK_LISTINGS: DisplayToken[] = [
 ];
 
 const FALLBACK_TRENDING: DisplayToken[] = [
-  { symbol: 'BONKAI', name: 'Bonkai', address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsk', price: 0.000042, change24h: 340, mcap: 420000, safety: 'safe', safetyScore: 87, holders: 1240, age: '', volume24h: 2400000, liquidity: 85000, rank: 1 },
-  { symbol: 'WIFM', name: 'WifMoon', address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', price: 0.00089, change24h: 55, mcap: 890000, safety: 'safe', safetyScore: 82, holders: 3200, age: '', volume24h: 1100000, liquidity: 220000, rank: 2 },
-  { symbol: 'SPELPE', name: 'SolPepe', address: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', price: 0.000034, change24h: 180, mcap: 340000, safety: 'warn', safetyScore: 61, holders: 890, age: '', volume24h: 880000, liquidity: 65000, rank: 3 },
-  { symbol: 'CIAD', name: 'CatInADog', address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', price: 0.00055, change24h: 42, mcap: 550000, safety: 'warn', safetyScore: 55, holders: 1100, age: '', volume24h: 550000, liquidity: 95000, rank: 4 },
-  { symbol: 'MEMEX', name: 'MemeX', address: 'MemeX1111111111111111111111111111111111111', price: 0.0021, change24h: 28, mcap: 2100000, safety: 'safe', safetyScore: 70, holders: 4500, age: '', volume24h: 320000, liquidity: 180000, rank: 5 },
+  { symbol: 'BONKAI', name: 'Bonkai',    address: 'BnKa111111111111111111111111111111111111111', price: 0.000042,  change24h: 340,  mcap: 420000,  safety: 'safe', safetyScore: 87, holders: 1240, age: '', volume24h: 2400000,  liquidity: 85000,  rank: 1  },
+  { symbol: 'WIFM',   name: 'WifMoon',   address: 'WiFm111111111111111111111111111111111111111', price: 0.00089,   change24h: 55,   mcap: 890000,  safety: 'safe', safetyScore: 82, holders: 3200, age: '', volume24h: 1100000,  liquidity: 220000, rank: 2  },
+  { symbol: 'SPELPE', name: 'SolPepe',   address: 'SpeLpE11111111111111111111111111111111111111', price: 0.000034,  change24h: 180,  mcap: 340000,  safety: 'warn', safetyScore: 61, holders: 890,  age: '', volume24h: 880000,   liquidity: 65000,  rank: 3  },
+  { symbol: 'CIAD',   name: 'CatInADog', address: 'CiAd111111111111111111111111111111111111111', price: 0.00055,   change24h: 42,   mcap: 550000,  safety: 'warn', safetyScore: 55, holders: 1100, age: '', volume24h: 550000,   liquidity: 95000,  rank: 4  },
+  { symbol: 'MEMEX',  name: 'MemeX',     address: 'MeMe111111111111111111111111111111111111111', price: 0.0021,    change24h: 28,   mcap: 2100000, safety: 'safe', safetyScore: 70, holders: 4500, age: '', volume24h: 320000,   liquidity: 180000, rank: 5  },
+  { symbol: 'DOGNFT', name: 'DogNFT',    address: 'DoGnFt11111111111111111111111111111111111111', price: 0.000018,  change24h: 95,   mcap: 180000,  safety: 'warn', safetyScore: 48, holders: 620,  age: '', volume24h: 420000,   liquidity: 32000,  rank: 6  },
+  { symbol: 'RUGZ',   name: 'RugZero',   address: 'RuGz111111111111111111111111111111111111111', price: 0.0000012, change24h: 1200, mcap: 12000,   safety: 'rug',  safetyScore: 18, holders: 88,   age: '', volume24h: 95000,    liquidity: 4200,   rank: 7  },
+  { symbol: 'POOCAT', name: 'PooCat',    address: 'PoOcAt11111111111111111111111111111111111111', price: 0.000091,  change24h: 210,  mcap: 910000,  safety: 'warn', safetyScore: 52, holders: 2100, age: '', volume24h: 680000,   liquidity: 78000,  rank: 8  },
+  { symbol: 'MOONAI', name: 'Moon AI',   address: 'MoOnAi11111111111111111111111111111111111111', price: 0.0041,    change24h: 18,   mcap: 4100000, safety: 'safe', safetyScore: 75, holders: 8900, age: '', volume24h: 1800000,  liquidity: 340000, rank: 9  },
+  { symbol: 'SOLAPE', name: 'Sol Ape',   address: 'SoLaPe11111111111111111111111111111111111111', price: 0.00033,   change24h: 67,   mcap: 330000,  safety: 'warn', safetyScore: 58, holders: 1500, age: '', volume24h: 480000,   liquidity: 55000,  rank: 10 },
 ];
 
 const _t = Math.floor(Date.now() / 1000);
@@ -802,7 +807,7 @@ export default function Home() {
     try {
       bumpApiCount(1);
       const result = await getTrending(20);
-      setTrendingTokens(result.map(t => {
+      const mapped = result.map(t => {
         const score = computeProxyScore(t.liquidity, t.marketcap, t.priceChange24hPercent, t.volume24hUSD);
         return {
           symbol: t.symbol || '???',
@@ -819,7 +824,8 @@ export default function Home() {
           liquidity: t.liquidity,
           rank: t.rank,
         };
-      }));
+      });
+      setTrendingTokens(mapped.length > 0 ? mapped : FALLBACK_TRENDING);
     } catch {
       console.error('getTrending failed, using fallback');
       setTrendingTokens(FALLBACK_TRENDING);
@@ -1215,7 +1221,7 @@ export default function Home() {
       });
   }, [liveSwaps, search, safetyFilter, liveFeedSortField]);
 
-  // Top 6 unique tokens in the feed — look up in allKnown first, then feedPrices, then stub
+  // Top 6 unique tokens in the feed — built from swap data + feedPrices only
   const feedTokenCards = useMemo((): DisplayToken[] => {
     const seen = new Set<string>();
     const unique: LiveSwap[] = [];
@@ -1227,10 +1233,8 @@ export default function Home() {
       }
     }
     return unique.map(s => {
-      const known = allKnown.find(t => t.symbol === s.tokenSymbol || t.address === s.tokenAddress);
-      if (known) return known;
       const priceData = feedPrices[s.tokenAddress];
-      const score = 30;
+      const score = priceData ? 40 : 30;
       return {
         symbol:      s.tokenSymbol,
         name:        s.tokenSymbol,
@@ -1245,7 +1249,7 @@ export default function Home() {
         volume24h:   0,
       };
     });
-  }, [liveSwaps, allKnown, feedPrices]);
+  }, [liveSwaps, feedPrices]);
 
   // Whale radar filtering
   const whaleSafeCount    = useMemo(() => whaleTxs.filter(t => t.side === 'buy').length,  [whaleTxs]);
