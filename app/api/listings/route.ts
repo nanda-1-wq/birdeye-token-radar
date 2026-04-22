@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 const BASE_URL = 'https://public-api.birdeye.so';
 
 export async function GET() {
-  const apiKey = process.env.NEXT_PUBLIC_BIRDEYE_API_KEY ?? '';
+  const apiKey = process.env.BIRDEYE_API_KEY || process.env.NEXT_PUBLIC_BIRDEYE_API_KEY || '';
   const params = new URLSearchParams({
     sort_by: 'mc',
     sort_type: 'desc',

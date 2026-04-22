@@ -28,7 +28,7 @@ function timeAgo(unixTime: number): string {
 }
 
 export async function GET() {
-  const apiKey = process.env.NEXT_PUBLIC_BIRDEYE_API_KEY ?? '';
+  const apiKey = process.env.BIRDEYE_API_KEY || process.env.NEXT_PUBLIC_BIRDEYE_API_KEY || '';
   const headers = {
     'X-API-KEY': apiKey,
     'x-chain': 'solana',

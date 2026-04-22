@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const addresses = searchParams.get('addresses') ?? '';
   if (!addresses) return NextResponse.json({ data: {} });
 
-  const apiKey = process.env.NEXT_PUBLIC_BIRDEYE_API_KEY ?? '';
+  const apiKey = process.env.BIRDEYE_API_KEY || process.env.NEXT_PUBLIC_BIRDEYE_API_KEY || '';
   const addrList = addresses.split(',').map(a => a.trim()).filter(Boolean);
 
   const results = await Promise.allSettled(

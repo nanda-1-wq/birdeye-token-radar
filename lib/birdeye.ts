@@ -1,7 +1,7 @@
 const BASE_URL = 'https://public-api.birdeye.so';
 
 function getHeaders(): HeadersInit {
-  const apiKey = process.env.NEXT_PUBLIC_BIRDEYE_API_KEY ?? '';
+  const apiKey = process.env.BIRDEYE_API_KEY || process.env.NEXT_PUBLIC_BIRDEYE_API_KEY || '';
   return {
     'X-API-KEY': apiKey,
     'x-chain': 'solana',
@@ -48,7 +48,10 @@ export interface WhaleTx {
 export async function getTrending(limit = 20): Promise<TrendingToken[]> {
   // Call our server-side proxy to avoid rate limiting from multiple browser tabs
   const res = await fetch(`/api/trending?limit=${limit}`);
-  if (!res.ok) throw new Error(`getTrending failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`getTrending failed: ${res.status} — ${body}`);
+  }
   const json = await res.json();
   const items: unknown[] = json?.data?.tokens ?? json?.data?.items ?? [];
   return (items as Record<string, unknown>[]).map((item) => ({
@@ -72,7 +75,10 @@ export async function getTrending(limit = 20): Promise<TrendingToken[]> {
 export async function getNewListings(limit = 20): Promise<NewListingToken[]> {
   // Call our server-side proxy to avoid rate limiting from multiple browser tabs
   const res = await fetch(`/api/listings?limit=${limit}`);
-  if (!res.ok) throw new Error(`getNewListings failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`getNewListings failed: ${res.status} — ${body}`);
+  }
   const json = await res.json();
   const items: unknown[] = json?.data?.tokens ?? json?.data?.items ?? [];
   return (items as Record<string, unknown>[]).map((item) => ({
