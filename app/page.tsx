@@ -61,6 +61,57 @@ const FALLBACK_TRENDING: DisplayToken[] = [
   { symbol: 'MEMEX', name: 'MemeX', address: 'MemeX1111111111111111111111111111111111111', price: 0.0021, change24h: 28, mcap: 2100000, safety: 'safe', safetyScore: 70, holders: 4500, age: '', volume24h: 320000, liquidity: 180000, rank: 5 },
 ];
 
+const _t = Math.floor(Date.now() / 1000);
+
+const FALLBACK_MEMES: DisplayToken[] = [
+  { symbol: 'PUMPCAT', name: 'Pump Cat',   address: 'PuMpCaT111111111111111111111111111111111111', price: 0.0000034,  change24h: 420,  mcap: 34000,  safety: 'warn', safetyScore: 38, holders: 340, age: '', volume24h: 89000,  liquidity: 12000 },
+  { symbol: 'MOONPUP', name: 'Moon Pup',   address: 'MoOnPuP111111111111111111111111111111111111', price: 0.00000091, change24h: 280,  mcap: 9100,   safety: 'rug',  safetyScore: 22, holders: 88,  age: '', volume24h: 45000,  liquidity: 3200  },
+  { symbol: 'SOLRAT',  name: 'Sol Rat',    address: 'SoLrAt1111111111111111111111111111111111111', price: 0.0000012,  change24h: 190,  mcap: 12000,  safety: 'warn', safetyScore: 41, holders: 210, age: '', volume24h: 32000,  liquidity: 8500  },
+  { symbol: 'FROGGY',  name: 'Froggy',     address: 'FrOgGy1111111111111111111111111111111111111', price: 0.0000005,  change24h: 155,  mcap: 5000,   safety: 'rug',  safetyScore: 18, holders: 55,  age: '', volume24h: 19000,  liquidity: 1800  },
+  { symbol: 'DEGENX',  name: 'Degen X',    address: 'DeGeNx1111111111111111111111111111111111111', price: 0.0000078,  change24h: 88,   mcap: 78000,  safety: 'warn', safetyScore: 44, holders: 560, age: '', volume24h: 67000,  liquidity: 24000 },
+  { symbol: 'RATKING', name: 'Rat King',   address: 'RaTkInG111111111111111111111111111111111111', price: 0.0000021,  change24h: 312,  mcap: 21000,  safety: 'rug',  safetyScore: 15, holders: 120, age: '', volume24h: 58000,  liquidity: 5400  },
+];
+
+const FALLBACK_SMART_MONEY: DisplayToken[] = [
+  { symbol: 'JTO',    name: 'Jito',         address: 'jtojtomepa8berqoembperngkttmbehomswrapsol1', price: 2.84,   change24h: 12.4, mcap: 420000000,  safety: 'safe', safetyScore: 85, holders: 45000,  age: '', volume24h: 18000000,  liquidity: 8200000  },
+  { symbol: 'PYTH',   name: 'Pyth Network', address: 'HZ1JovNiVvGqNLQLjnkuWWmxq7yJZnbpJE5m5XWH', price: 0.31,   change24h: 8.7,  mcap: 280000000,  safety: 'safe', safetyScore: 82, holders: 38000,  age: '', volume24h: 12000000,  liquidity: 5600000  },
+  { symbol: 'DRIFT',  name: 'Drift',        address: 'DriFtupJYLTosbwoN8koMbEYSx54aFAVLddWsbksjwg', price: 0.62,   change24h: 22.1, mcap: 180000000,  safety: 'safe', safetyScore: 78, holders: 28000,  age: '', volume24h: 22000000,  liquidity: 4800000  },
+  { symbol: 'ORCA',   name: 'Orca',         address: 'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1xux', price: 3.41,   change24h: 18.3, mcap: 340000000,  safety: 'safe', safetyScore: 80, holders: 62000,  age: '', volume24h: 31000000,  liquidity: 9100000  },
+  { symbol: 'MNGO',   name: 'Mango',        address: 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLk', price: 0.018,  change24h: 34.5, mcap: 45000000,   safety: 'warn', safetyScore: 62, holders: 12000,  age: '', volume24h: 8900000,   liquidity: 2100000  },
+  { symbol: 'STEP',   name: 'Step Finance', address: 'StepAscQoEioFxxWGnh2sLBDFp9d8rvKz2Xjdsc1Zx', price: 0.044,  change24h: 28.9, mcap: 22000000,   safety: 'warn', safetyScore: 58, holders: 9400,   age: '', volume24h: 4200000,   liquidity: 1300000  },
+];
+
+const FALLBACK_DEFI_PULSE: DisplayToken[] = [
+  { symbol: 'SOL',    name: 'Solana',    address: 'So11111111111111111111111111111111111111112',   price: 142.50, change24h: 3.2,  mcap: 65000000000, safety: 'safe', safetyScore: 98, holders: 2800000, age: '', volume24h: 2100000000, liquidity: 890000000 },
+  { symbol: 'JUP',    name: 'Jupiter',   address: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', price: 0.89,   change24h: 5.1,  mcap: 1200000000,  safety: 'safe', safetyScore: 91, holders: 450000,  age: '', volume24h: 280000000,  liquidity: 95000000  },
+  { symbol: 'BONK',   name: 'Bonk',      address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', price: 0.0000218, change24h: 7.8, mcap: 1400000000, safety: 'safe', safetyScore: 88, holders: 680000, age: '', volume24h: 340000000, liquidity: 82000000 },
+  { symbol: 'WIF',    name: 'dogwifhat', address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', price: 1.24,   change24h: 9.4,  mcap: 1240000000,  safety: 'safe', safetyScore: 86, holders: 320000,  age: '', volume24h: 195000000,  liquidity: 68000000  },
+  { symbol: 'POPCAT', name: 'Popcat',    address: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr', price: 0.48,   change24h: 11.2, mcap: 480000000,   safety: 'safe', safetyScore: 83, holders: 180000,  age: '', volume24h: 120000000,  liquidity: 42000000  },
+  { symbol: 'MSOL',   name: 'Marinade',  address: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', price: 163.20, change24h: 3.4,  mcap: 890000000,   safety: 'safe', safetyScore: 92, holders: 95000,   age: '', volume24h: 88000000,   liquidity: 55000000  },
+];
+
+const FALLBACK_WHALE_TXS: WhaleTx[] = [
+  { txHash: 'fb1', side: 'buy',  tokenSymbol: 'WIF',    tokenAddress: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', counterSymbol: 'SOL',  amountUsd: 48200,  walletAddress: 'Wh4Le1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', timeAgo: '2m ago',  dex: 'raydium'  },
+  { txHash: 'fb2', side: 'sell', tokenSymbol: 'BONK',   tokenAddress: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',  counterSymbol: 'USDC', amountUsd: 92500,  walletAddress: 'Wh4Le2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', timeAgo: '5m ago',  dex: 'jupiter'  },
+  { txHash: 'fb3', side: 'buy',  tokenSymbol: 'JUP',    tokenAddress: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',   counterSymbol: 'SOL',  amountUsd: 215000, walletAddress: 'Wh4Le3cccccccccccccccccccccccccccccccccccc', timeAgo: '8m ago',  dex: 'orca'     },
+  { txHash: 'fb4', side: 'buy',  tokenSymbol: 'POPCAT', tokenAddress: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr',  counterSymbol: 'SOL',  amountUsd: 31800,  walletAddress: 'Wh4Le4dddddddddddddddddddddddddddddddddddd', timeAgo: '12m ago', dex: 'raydium'  },
+  { txHash: 'fb5', side: 'sell', tokenSymbol: 'SOL',    tokenAddress: 'So11111111111111111111111111111111111111112',     counterSymbol: 'USDC', amountUsd: 540000, walletAddress: 'Wh4Le5eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', timeAgo: '18m ago', dex: 'jupiter'  },
+  { txHash: 'fb6', side: 'buy',  tokenSymbol: 'WIF',    tokenAddress: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', counterSymbol: 'SOL',  amountUsd: 78400,  walletAddress: 'Wh4Le6fffffffffffffffffffffffffffffffffffff', timeAgo: '24m ago', dex: 'raydium'  },
+];
+
+const FALLBACK_LIVE_SWAPS: LiveSwap[] = [
+  { txHash: 'ls1', blockUnixTime: _t - 8,   side: 'buy',  amountUsd: 4820,  tokenSymbol: 'BONK',   tokenAddress: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', counterSymbol: 'SOL',  walletAddress: 'LS1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', source: 'raydium'  },
+  { txHash: 'ls2', blockUnixTime: _t - 22,  side: 'sell', amountUsd: 9250,  tokenSymbol: 'WIF',    tokenAddress: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',  counterSymbol: 'USDC', walletAddress: 'LS2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', source: 'jupiter'  },
+  { txHash: 'ls3', blockUnixTime: _t - 41,  side: 'buy',  amountUsd: 1340,  tokenSymbol: 'JUP',    tokenAddress: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',   counterSymbol: 'SOL',  walletAddress: 'LS3cccccccccccccccccccccccccccccccccccccccc', source: 'orca'     },
+  { txHash: 'ls4', blockUnixTime: _t - 67,  side: 'buy',  amountUsd: 720,   tokenSymbol: 'POPCAT', tokenAddress: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr',  counterSymbol: 'SOL',  walletAddress: 'LS4dddddddddddddddddddddddddddddddddddddddd', source: 'raydium'  },
+  { txHash: 'ls5', blockUnixTime: _t - 89,  side: 'sell', amountUsd: 18200, tokenSymbol: 'BONK',   tokenAddress: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', counterSymbol: 'USDC', walletAddress: 'LS5eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', source: 'jupiter'  },
+  { txHash: 'ls6', blockUnixTime: _t - 112, side: 'buy',  amountUsd: 5500,  tokenSymbol: 'WIF',    tokenAddress: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',  counterSymbol: 'SOL',  walletAddress: 'LS6ffffffffffffffffffffffffffffffffffffffff', source: 'raydium'  },
+  { txHash: 'ls7', blockUnixTime: _t - 145, side: 'sell', amountUsd: 3100,  tokenSymbol: 'JUP',    tokenAddress: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',   counterSymbol: 'USDC', walletAddress: 'LS7gggggggggggggggggggggggggggggggggggggggg', source: 'orca'     },
+  { txHash: 'ls8', blockUnixTime: _t - 178, side: 'buy',  amountUsd: 890,   tokenSymbol: 'SOL',    tokenAddress: 'So11111111111111111111111111111111111111112',     counterSymbol: 'USDC', walletAddress: 'LS8hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh', source: 'jupiter'  },
+  { txHash: 'ls9', blockUnixTime: _t - 203, side: 'sell', amountUsd: 2240,  tokenSymbol: 'POPCAT', tokenAddress: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr',  counterSymbol: 'SOL',  walletAddress: 'LS9iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii', source: 'raydium'  },
+  { txHash: 'ls0', blockUnixTime: _t - 251, side: 'buy',  amountUsd: 6700,  tokenSymbol: 'BONK',   tokenAddress: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', counterSymbol: 'SOL',  walletAddress: 'LS0jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj', source: 'jupiter'  },
+];
+
 const TABS: { id: Tab; label: string }[] = [
   { id: 'trending',    label: 'Trending' },
   { id: 'listings',   label: 'New Listings' },
@@ -648,9 +699,14 @@ export default function Home() {
       const res = await fetch('/api/whales');
       if (res.ok) {
         const json = await res.json();
-        setWhaleTxs(json.whales ?? []);
+        const whales = json.whales ?? [];
+        setWhaleTxs(whales.length > 0 ? whales : FALLBACK_WHALE_TXS);
+      } else {
+        setWhaleTxs(FALLBACK_WHALE_TXS);
       }
-    } catch {}
+    } catch {
+      setWhaleTxs(FALLBACK_WHALE_TXS);
+    }
     setWhaleLoading(false);
   }, []);
 
@@ -672,7 +728,8 @@ export default function Home() {
           walletAddress: String(s.walletAddress ?? ''),
           source:        String(s.source ?? ''),
         }));
-        setLiveSwaps(swaps);
+        const liveFeedData = swaps.length > 0 ? swaps : FALLBACK_LIVE_SWAPS;
+        setLiveSwaps(liveFeedData);
         const now = new Date();
         setLivefeedUpdatedAt(`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`);
 
@@ -691,8 +748,12 @@ export default function Home() {
             }
           } catch {}
         }
+      } else {
+        setLiveSwaps(FALLBACK_LIVE_SWAPS);
       }
-    } catch {}
+    } catch {
+      setLiveSwaps(FALLBACK_LIVE_SWAPS);
+    }
     setLivefeedLoading(false);
   }, []);
 
@@ -704,7 +765,7 @@ export default function Home() {
       if (res.ok) {
         const json = await res.json();
         const items: Record<string, unknown>[] = json?.data?.tokens ?? [];
-        setMemeTokens(items.map((t) => {
+        const mapped = items.map((t) => {
           const score = computeProxyScore(
             Number(t.liquidity ?? 0),
             Number(t.marketcap ?? 0),
@@ -725,9 +786,14 @@ export default function Home() {
             volume24h: Number(t.volume24hUSD ?? 0),
             liquidity: Number(t.liquidity ?? 0),
           };
-        }));
+        });
+        setMemeTokens(mapped.length > 0 ? mapped : FALLBACK_MEMES);
+      } else {
+        setMemeTokens(FALLBACK_MEMES);
       }
-    } catch {}
+    } catch {
+      setMemeTokens(FALLBACK_MEMES);
+    }
     setMemeLoading(false);
   }, []);
 
@@ -739,7 +805,7 @@ export default function Home() {
       if (res.ok) {
         const json = await res.json();
         const items: Record<string, unknown>[] = json?.data?.tokens ?? [];
-        setSmartMoneyTokens(items.map((t) => {
+        const mapped = items.map((t) => {
           const score = computeProxyScore(
             Number(t.liquidity ?? 0),
             Number(t.marketcap ?? 0),
@@ -760,9 +826,14 @@ export default function Home() {
             volume24h:   Number(t.volume24hUSD ?? 0),
             liquidity:   Number(t.liquidity ?? 0),
           };
-        }));
+        });
+        setSmartMoneyTokens(mapped.length > 0 ? mapped : FALLBACK_SMART_MONEY);
+      } else {
+        setSmartMoneyTokens(FALLBACK_SMART_MONEY);
       }
-    } catch {}
+    } catch {
+      setSmartMoneyTokens(FALLBACK_SMART_MONEY);
+    }
     setSmartMoneyLoading(false);
   }, []);
 
@@ -774,7 +845,7 @@ export default function Home() {
       if (res.ok) {
         const json = await res.json();
         const items: Record<string, unknown>[] = json?.data?.tokens ?? [];
-        setDefiPulseTokens(items.map((t) => {
+        const mapped = items.map((t) => {
           const score = computeProxyScore(
             Number(t.liquidity ?? 0),
             Number(t.marketcap ?? 0),
@@ -795,9 +866,14 @@ export default function Home() {
             volume24h:   Number(t.volume24hUSD ?? 0),
             liquidity:   Number(t.liquidity ?? 0),
           };
-        }));
+        });
+        setDefiPulseTokens(mapped.length > 0 ? mapped : FALLBACK_DEFI_PULSE);
+      } else {
+        setDefiPulseTokens(FALLBACK_DEFI_PULSE);
       }
-    } catch {}
+    } catch {
+      setDefiPulseTokens(FALLBACK_DEFI_PULSE);
+    }
     setDefiPulseLoading(false);
   }, []);
 
