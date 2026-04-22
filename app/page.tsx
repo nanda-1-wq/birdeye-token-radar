@@ -780,10 +780,13 @@ export default function Home() {
   const [memeLoading, setMemeLoading] = useState(false);
   const [whaleTxs, setWhaleTxs] = useState<WhaleTx[]>([]);
   const [whaleLoading, setWhaleLoading] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [trendingLoading, setTrendingLoading] = useState(false);
+  const [listingsLoading, setListingsLoading] = useState(false);
   const [apiCallCount, setApiCallCount] = useState(0);
   const apiCallRef = useRef(0);
   const hasFetchedRef = useRef(false);
+  const loadedTabsRef = useRef<Set<Tab>>(new Set());
+  const sparklinedTabsRef = useRef<Set<Tab>>(new Set());
   const [sparklines, setSparklines] = useState<Record<string, number[]>>({});
   const [overviewAddress, setOverviewAddress] = useState<string | null>(null);
 
@@ -792,20 +795,14 @@ export default function Home() {
     setApiCallCount(apiCallRef.current);
   }
 
-  const fetchAllData = useCallback(async () => {
-    setLoading(true);
+  const fetchTrending = useCallback(async () => {
+    setTrendingLoading(true);
     const now = new Date();
-    const hh = now.getHours().toString().padStart(2, '0');
-    const mm = now.getMinutes().toString().padStart(2, '0');
-    setUpdateTime(`${hh}:${mm}`);
-
-    const [trendingResult, listingsResult] = await Promise.allSettled([
-      (async () => { bumpApiCount(1); return getTrending(20); })(),
-      (async () => { bumpApiCount(1); return getNewListings(20); })(),
-    ]);
-
-    if (trendingResult.status === 'fulfilled') {
-      setTrendingTokens(trendingResult.value.map(t => {
+    setUpdateTime(`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`);
+    try {
+      bumpApiCount(1);
+      const result = await getTrending(20);
+      setTrendingTokens(result.map(t => {
         const score = computeProxyScore(t.liquidity, t.marketcap, t.priceChange24hPercent, t.volume24hUSD);
         return {
           symbol: t.symbol || '???',
@@ -823,13 +820,19 @@ export default function Home() {
           rank: t.rank,
         };
       }));
-    } else {
-      console.error('getTrending failed, using fallback:', trendingResult.reason);
+    } catch {
+      console.error('getTrending failed, using fallback');
       setTrendingTokens(FALLBACK_TRENDING);
     }
+    setTrendingLoading(false);
+  }, []);
 
-    if (listingsResult.status === 'fulfilled') {
-      setListingTokens(listingsResult.value.map(t => {
+  const fetchListings = useCallback(async () => {
+    setListingsLoading(true);
+    try {
+      bumpApiCount(1);
+      const result = await getNewListings(20);
+      setListingTokens(result.map(t => {
         const score = computeProxyScore(t.liquidity, t.marketcap, t.priceChange24hPercent, t.volume24hUSD);
         return {
           symbol: t.symbol || '???',
@@ -846,12 +849,11 @@ export default function Home() {
           liquidity: t.liquidity,
         };
       }));
-    } else {
-      console.error('getNewListings failed, using fallback:', listingsResult.reason);
+    } catch {
+      console.error('getNewListings failed, using fallback');
       setListingTokens(FALLBACK_LISTINGS);
     }
-
-    setLoading(false);
+    setListingsLoading(false);
   }, []);
 
   const fetchWhales = useCallback(async () => {
@@ -1040,7 +1042,7 @@ export default function Home() {
   }, []);
 
   const fetchSparklines = useCallback(async (tokens: DisplayToken[]) => {
-    const addresses = tokens.map(t => t.address).filter(Boolean).slice(0, 10);
+    const addresses = tokens.map(t => t.address).filter(Boolean).slice(0, 5);
     if (addresses.length === 0) return;
     bumpApiCount(addresses.length); // 1 call per address
     try {
@@ -1051,6 +1053,28 @@ export default function Home() {
       }
     } catch {}
   }, []);
+
+  const handleTabClick = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    if (loadedTabsRef.current.has(tab)) return;
+    loadedTabsRef.current.add(tab);
+    if (tab === 'listings')    fetchListings();
+    if (tab === 'livefeed')    fetchLivefeed();
+    if (tab === 'whalerader')  fetchWhales();
+    if (tab === 'mememonitor') fetchMemes();
+    if (tab === 'smartmoney')  fetchSmartMoney();
+    if (tab === 'defipulse')   fetchDefiPulse();
+  }, [fetchListings, fetchLivefeed, fetchWhales, fetchMemes, fetchSmartMoney, fetchDefiPulse]);
+
+  const refreshCurrentTab = useCallback((tab: Tab) => {
+    if (tab === 'trending')    fetchTrending();
+    if (tab === 'listings')    fetchListings();
+    if (tab === 'livefeed')    fetchLivefeed();
+    if (tab === 'whalerader')  fetchWhales();
+    if (tab === 'mememonitor') fetchMemes();
+    if (tab === 'smartmoney')  fetchSmartMoney();
+    if (tab === 'defipulse')   fetchDefiPulse();
+  }, [fetchTrending, fetchListings, fetchLivefeed, fetchWhales, fetchMemes, fetchSmartMoney, fetchDefiPulse]);
 
   useEffect(() => {
     // Load watchlist (full token objects) from localStorage
@@ -1075,54 +1099,31 @@ export default function Home() {
     if (hasFetchedRef.current) return () => window.removeEventListener('storage', onStorage);
     hasFetchedRef.current = true;
 
-    fetchAllData();
-    fetchWhales();
-    fetchLivefeed();
-    fetchMemes();
-    fetchSmartMoney();
-    fetchDefiPulse();
-    fetchSparklines(FALLBACK_TRENDING);
+    // On mount: only fetch Trending (lazy load all other tabs on click)
+    loadedTabsRef.current.add('trending');
+    fetchTrending();
 
     return () => window.removeEventListener('storage', onStorage);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch sparklines for current tab's tokens — once per tab, max 5 calls.
+  // Runs when any token list updates; we guard with sparklinedTabsRef.
   useEffect(() => {
-    const id = setInterval(fetchAllData, 120_000);
-    return () => clearInterval(id);
-  }, [fetchAllData]);
-
-  useEffect(() => {
-    const id = setInterval(fetchWhales, 120_000);
-    return () => clearInterval(id);
-  }, [fetchWhales]);
-
-  useEffect(() => {
-    const id = setInterval(fetchLivefeed, 120_000);
-    return () => clearInterval(id);
-  }, [fetchLivefeed]);
-
-  useEffect(() => {
-    const id = setInterval(fetchMemes, 120_000);
-    return () => clearInterval(id);
-  }, [fetchMemes]);
-
-  useEffect(() => {
-    const id = setInterval(fetchSmartMoney, 120_000);
-    return () => clearInterval(id);
-  }, [fetchSmartMoney]);
-
-  useEffect(() => {
-    const id = setInterval(fetchDefiPulse, 120_000);
-    return () => clearInterval(id);
-  }, [fetchDefiPulse]);
-
-  // Fetch sparklines whenever trending tokens change (skip fallback dummy addresses)
-  useEffect(() => {
-    const real = trendingTokens.filter(t => t.address && t.address.length >= 32);
-    if (real.length > 0) fetchSparklines(real.slice(0, 10));
+    if (sparklinedTabsRef.current.has(activeTab)) return;
+    let tokens: DisplayToken[] = [];
+    if (activeTab === 'trending')    tokens = trendingTokens;
+    if (activeTab === 'listings')    tokens = listingTokens;
+    if (activeTab === 'mememonitor') tokens = memeTokens;
+    if (activeTab === 'smartmoney')  tokens = smartMoneyTokens;
+    if (activeTab === 'defipulse')   tokens = defiPulseTokens;
+    if (activeTab === 'watchlist')   tokens = watchedTokens;
+    const real = tokens.filter(t => t.address && t.address.length >= 32).slice(0, 5);
+    if (real.length === 0) return;
+    sparklinedTabsRef.current.add(activeTab);
+    fetchSparklines(real);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trendingTokens]);
+  }, [activeTab, trendingTokens, listingTokens, memeTokens, smartMoneyTokens, defiPulseTokens, watchedTokens]);
 
   // Reset filters on tab switch
   useEffect(() => {
@@ -1272,11 +1273,13 @@ export default function Home() {
   const showGrid  = TOKEN_GRID_TABS.includes(activeTab) && !isPlaceholderTab;
   const showEmpty = activeTab === 'watchlist' && baseTokens.length === 0;
   const isTabLoading =
+    (activeTab === 'trending'    && trendingLoading) ||
+    (activeTab === 'listings'    && listingsLoading) ||
+    (activeTab === 'livefeed'    && livefeedLoading) ||
+    (activeTab === 'whalerader'  && whaleLoading) ||
     (activeTab === 'mememonitor' && memeLoading) ||
     (activeTab === 'smartmoney'  && smartMoneyLoading) ||
-    (activeTab === 'defipulse'   && defiPulseLoading) ||
-    (activeTab === 'trending' && loading) ||
-    (activeTab === 'listings' && loading);
+    (activeTab === 'defipulse'   && defiPulseLoading);
 
   return (
     <>
@@ -1382,18 +1385,18 @@ export default function Home() {
                 )}
 
                 <button
-                  onClick={fetchAllData}
-                  disabled={loading}
+                  onClick={() => refreshCurrentTab(activeTab)}
+                  disabled={isTabLoading}
                   style={{
-                    padding: '5px 12px', borderRadius: 6, cursor: loading ? 'not-allowed' : 'pointer',
+                    padding: '5px 12px', borderRadius: 6, cursor: isTabLoading ? 'not-allowed' : 'pointer',
                     background: 'rgba(255,255,255,0.05)',
                     border: '1px solid rgba(255,255,255,0.12)',
-                    color: loading ? 'var(--muted)' : 'var(--text)', fontSize: 11, fontWeight: 700,
+                    color: isTabLoading ? 'var(--muted)' : 'var(--text)', fontSize: 11, fontWeight: 700,
                     letterSpacing: '0.04em',
                     fontFamily: 'var(--font-space-mono), monospace',
                   }}
                 >
-                  {loading ? 'Loading...' : 'Refresh'}
+                  {isTabLoading ? 'Loading...' : 'Refresh'}
                 </button>
               </div>
             </div>
@@ -1431,7 +1434,7 @@ export default function Home() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => handleTabClick(tab.id)}
                     style={{
                       padding: '7px 18px', borderRadius: 8, cursor: 'pointer',
                       fontSize: 13, fontWeight: 700,
