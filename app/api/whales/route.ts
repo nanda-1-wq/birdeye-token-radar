@@ -57,7 +57,6 @@ export async function GET() {
         })
         .then(json => {
           const items: Record<string, unknown>[] = json?.data?.items ?? [];
-          console.log(`[whales] ${symbol}: ${items.length} items fetched`);
           return items.map(item => ({ ...item, _trackedSymbol: symbol, _trackedAddress: address }));
         })
         .catch(err => {
@@ -70,8 +69,6 @@ export async function GET() {
   const all: Record<string, unknown>[] = results.flatMap(r =>
     r.status === 'fulfilled' ? r.value : []
   );
-
-  console.log(`[whales] combined: ${all.length} items`);
 
   type Side = Record<string, unknown> | undefined;
 
@@ -106,8 +103,6 @@ export async function GET() {
         dex:           String(item.source ?? ''),
       };
     });
-
-  console.log(`[whales] returning ${whales.length} txs (>= $${MIN_USD})`);
 
   return NextResponse.json({ whales }, {
     headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=15' },

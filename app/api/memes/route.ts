@@ -8,7 +8,6 @@ export async function GET() {
   const params = new URLSearchParams({
     sort_by: 'v24hChangePercent',
     sort_type: 'desc',
-    offset: '0',
     limit: '50',
     min_liquidity: '500',
     max_liquidity: '100000',

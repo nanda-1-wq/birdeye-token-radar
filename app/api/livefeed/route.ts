@@ -39,11 +39,6 @@ export async function GET() {
       const json = await res.json();
       const items: Record<string, unknown>[] = json?.data?.items ?? json?.data ?? [];
 
-      // Log first raw item so we can see the real field names from Birdeye
-      if (items.length > 0) {
-        console.log('[livefeed] raw swap fields:', JSON.stringify(items[0], null, 2));
-      }
-
       return items.map((item) => {
         const fromObj = (item.from as Record<string, unknown>) ?? {};
         const toObj   = (item.to   as Record<string, unknown>) ?? {};
