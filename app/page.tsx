@@ -261,10 +261,14 @@ function TokenCard({
   token,
   starred,
   onToggleStar,
+  sparklinePrices,
+  onClickOverview,
 }: {
   token: DisplayToken;
   starred: boolean;
   onToggleStar: () => void;
+  sparklinePrices?: number[];
+  onClickOverview?: () => void;
 }) {
   const changePos = token.change24h >= 0;
   const cfg       = SAFETY_CONFIG[token.safety];
@@ -304,21 +308,26 @@ function TokenCard({
         <SafetyDonut score={token.safetyScore} />
       </div>
 
-      {/* Price + change */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{
-          fontSize: 20, fontWeight: 700,
-          color: 'var(--text)',
-          fontFamily: 'var(--font-space-mono), monospace',
-        }}>
-          ${formatPrice(token.price)}
-        </span>
-        <span style={{
-          fontSize: 12, fontWeight: 700,
-          color: changePos ? '#00ff9d' : '#ff3b6b',
-        }}>
-          {formatChange(token.change24h)}
-        </span>
+      {/* Price + change + sparkline */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{
+            fontSize: 20, fontWeight: 700,
+            color: 'var(--text)',
+            fontFamily: 'var(--font-space-mono), monospace',
+          }}>
+            ${formatPrice(token.price)}
+          </span>
+          <span style={{
+            fontSize: 12, fontWeight: 700,
+            color: changePos ? '#00ff9d' : '#ff3b6b',
+          }}>
+            {formatChange(token.change24h)}
+          </span>
+        </div>
+        {sparklinePrices && sparklinePrices.length >= 2 && (
+          <Sparkline prices={sparklinePrices} color={changePos ? '#00ff9d' : '#ff3b6b'} />
+        )}
       </div>
 
       {/* 2x2 data grid */}
@@ -335,7 +344,10 @@ function TokenCard({
         borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 10,
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 11, color: 'var(--accent)', opacity: 0.65, cursor: 'pointer' }}>
+          <span
+            onClick={onClickOverview}
+            style={{ fontSize: 11, color: 'var(--accent)', opacity: 0.65, cursor: onClickOverview ? 'pointer' : 'default' }}
+          >
             Click for full breakdown
           </span>
           <a
@@ -367,6 +379,154 @@ function TokenCard({
         >
           {starred ? '★' : '☆'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function Sparkline({ prices, color = '#00ff9d' }: { prices: number[]; color?: string }) {
+  if (prices.length < 2) return null;
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || 1;
+  const W = 80, H = 28;
+  const pts = prices.map((p, i) => {
+    const x = (i / (prices.length - 1)) * W;
+    const y = H - ((p - min) / range) * H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <svg width={W} height={H} style={{ display: 'block' }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+interface TokenOverview {
+  address: string;
+  symbol: string;
+  name: string;
+  price: number;
+  priceChange24hPercent: number;
+  marketcap: number;
+  liquidity: number;
+  holder: number;
+  supply: number;
+  extensions?: {
+    website?: string;
+    twitter?: string;
+    description?: string;
+  };
+}
+
+function TokenOverviewModal({ address, onClose }: { address: string; onClose: () => void }) {
+  const [data, setData] = useState<TokenOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch(`/api/token-overview?address=${address}`)
+      .then(r => r.json())
+      .then(json => {
+        if (json?.data) setData(json.data as TokenOverview);
+        else setError(json?.error ?? 'No data');
+      })
+      .catch(() => setError('Failed to load'))
+      .finally(() => setLoading(false));
+  }, [address]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(4,6,10,0.85)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid rgba(0,255,157,0.25)',
+          borderRadius: 14,
+          padding: 28,
+          width: '100%', maxWidth: 480,
+          boxShadow: '0 0 48px rgba(0,255,157,0.08)',
+          fontFamily: 'var(--font-space-mono), monospace',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <span style={{ fontFamily: 'var(--font-syne), sans-serif', fontWeight: 700, fontSize: 17, color: 'var(--accent)' }}>
+            Token Overview
+          </span>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 20, lineHeight: 1 }}
+          >
+            ×
+          </button>
+        </div>
+
+        {loading && <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: 24 }}>Loading...</div>}
+        {error  && <div style={{ color: '#ff3b6b', fontSize: 13, textAlign: 'center', padding: 24 }}>{error}</div>}
+
+        {data && !loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-syne), sans-serif' }}>
+                {data.symbol}
+                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted)', marginLeft: 8 }}>{data.name}</span>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, wordBreak: 'break-all' }}>{address}</div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px' }}>
+              {[
+                { label: 'PRICE',     value: `$${formatPrice(data.price)}` },
+                { label: '24H CHANGE',value: formatChange(data.priceChange24hPercent), color: data.priceChange24hPercent >= 0 ? '#00ff9d' : '#ff3b6b' },
+                { label: 'MARKET CAP',value: formatMcap(data.marketcap)   },
+                { label: 'LIQUIDITY', value: formatVolume(data.liquidity) },
+                { label: 'HOLDERS',   value: (data.holder ?? 0).toLocaleString() },
+                { label: 'SUPPLY',    value: formatVolume(data.supply)    },
+              ].map(({ label, value, color }) => (
+                <div key={label}>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: 13, color: color ?? 'var(--text)' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {data.extensions?.description && (
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14 }}>
+                <div style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em', marginBottom: 6 }}>DESCRIPTION</div>
+                <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, opacity: 0.8 }}>
+                  {data.extensions.description.slice(0, 240)}{data.extensions.description.length > 240 ? '...' : ''}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14 }}>
+              <a href={`https://birdeye.so/token/${address}?chain=solana`} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
+                Birdeye ↗
+              </a>
+              {data.extensions?.website && (
+                <a href={data.extensions.website} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none' }}>
+                  Website ↗
+                </a>
+              )}
+              {data.extensions?.twitter && (
+                <a href={data.extensions.twitter} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 11, color: '#1d9bf0', textDecoration: 'none' }}>
+                  Twitter ↗
+                </a>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -624,6 +784,8 @@ export default function Home() {
   const [apiCallCount, setApiCallCount] = useState(0);
   const apiCallRef = useRef(0);
   const hasFetchedRef = useRef(false);
+  const [sparklines, setSparklines] = useState<Record<string, number[]>>({});
+  const [overviewAddress, setOverviewAddress] = useState<string | null>(null);
 
   function bumpApiCount(n = 1) {
     apiCallRef.current += n;
@@ -694,7 +856,7 @@ export default function Home() {
 
   const fetchWhales = useCallback(async () => {
     setWhaleLoading(true);
-    bumpApiCount(5); // 5 tokens × 1 call each
+    bumpApiCount(10); // 10 tokens × 1 call each
     try {
       const res = await fetch('/api/whales');
       if (res.ok) {
@@ -712,7 +874,7 @@ export default function Home() {
 
   const fetchLivefeed = useCallback(async () => {
     setLivefeedLoading(true);
-    bumpApiCount(5); // 5 tokens × 1 call each
+    bumpApiCount(10); // 10 tokens × 1 call each
     try {
       const res = await fetch('/api/livefeed');
       if (res.ok) {
@@ -877,6 +1039,19 @@ export default function Home() {
     setDefiPulseLoading(false);
   }, []);
 
+  const fetchSparklines = useCallback(async (tokens: DisplayToken[]) => {
+    const addresses = tokens.map(t => t.address).filter(Boolean).slice(0, 10);
+    if (addresses.length === 0) return;
+    bumpApiCount(addresses.length); // 1 call per address
+    try {
+      const res = await fetch(`/api/price-history?addresses=${addresses.join(',')}`);
+      if (res.ok) {
+        const json = await res.json();
+        setSparklines(prev => ({ ...prev, ...(json.data ?? {}) }));
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     // Load watchlist (full token objects) from localStorage
     const loadWatchlist = () => {
@@ -906,6 +1081,7 @@ export default function Home() {
     fetchMemes();
     fetchSmartMoney();
     fetchDefiPulse();
+    fetchSparklines(FALLBACK_TRENDING);
 
     return () => window.removeEventListener('storage', onStorage);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -940,6 +1116,13 @@ export default function Home() {
     const id = setInterval(fetchDefiPulse, 120_000);
     return () => clearInterval(id);
   }, [fetchDefiPulse]);
+
+  // Fetch sparklines whenever trending tokens change (skip fallback dummy addresses)
+  useEffect(() => {
+    const real = trendingTokens.filter(t => t.address && t.address.length >= 32);
+    if (real.length > 0) fetchSparklines(real.slice(0, 10));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendingTokens]);
 
   // Reset filters on tab switch
   useEffect(() => {
@@ -1493,6 +1676,8 @@ export default function Home() {
                         token={token}
                         starred={watchlistAddresses.has(token.address)}
                         onToggleStar={() => toggleWatchlist(token)}
+                        sparklinePrices={sparklines[token.address]}
+                        onClickOverview={() => setOverviewAddress(token.address)}
                       />
                     ))}
                   </div>
@@ -1808,6 +1993,8 @@ export default function Home() {
                       token={token}
                       starred={watchlistAddresses.has(token.address)}
                       onToggleStar={() => toggleWatchlist(token)}
+                      sparklinePrices={sparklines[token.address]}
+                      onClickOverview={() => setOverviewAddress(token.address)}
                     />
                   ))}
                 </div>
@@ -1816,6 +2003,13 @@ export default function Home() {
           )}
         </main>
       </div>
+
+      {overviewAddress && (
+        <TokenOverviewModal
+          address={overviewAddress}
+          onClose={() => setOverviewAddress(null)}
+        />
+      )}
     </>
   );
 }

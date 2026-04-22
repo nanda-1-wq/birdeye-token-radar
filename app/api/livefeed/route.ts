@@ -4,11 +4,16 @@ const BASE_URL = 'https://public-api.birdeye.so';
 const SOL_ADDR = 'So11111111111111111111111111111111111111112';
 
 const HOT_TOKENS = [
-  { address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',            symbol: 'BONK'   },
-  { address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',            symbol: 'WIF'    },
-  { address: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr',            symbol: 'POPCAT' },
-  { address: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',             symbol: 'JUP'    },
+  { address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',           symbol: 'BONK'   },
+  { address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',           symbol: 'WIF'    },
+  { address: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr',           symbol: 'POPCAT' },
+  { address: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',            symbol: 'JUP'    },
   { address: SOL_ADDR,                                                   symbol: 'SOL'    },
+  { address: 'MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5',            symbol: 'MEW'    },
+  { address: 'A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump',           symbol: 'FWOG'   },
+  { address: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So',           symbol: 'mSOL'   },
+  { address: 'Df6yfrKC8kZE3KNkrHERKzAetSxbrWeniQfyJY4Jjpj',           symbol: 'ORCA'   },
+  { address: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',          symbol: 'RAY'    },
 ];
 
 function headers(apiKey: string): HeadersInit {

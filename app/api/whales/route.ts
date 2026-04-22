@@ -8,6 +8,11 @@ const TOKENS = [
   { address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',  symbol: 'BONK'   },
   { address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',  symbol: 'WIF'    },
   { address: '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr',  symbol: 'POPCAT' },
+  { address: 'MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5',   symbol: 'MEW'    },
+  { address: 'A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump',  symbol: 'FWOG'   },
+  { address: 'Df6yfrKC8kZE3KNkrHERKzAetSxbrWeniQfyJY4Jjpj',  symbol: 'ORCA'   },
+  { address: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So',  symbol: 'mSOL'   },
+  { address: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R', symbol: 'RAY'    },
 ];
 
 // Use max(base_usd, quote_usd) — the API places tokens on either side
