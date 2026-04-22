@@ -643,7 +643,7 @@ export default function Home() {
 
   const fetchWhales = useCallback(async () => {
     setWhaleLoading(true);
-    bumpApiCount(3);
+    bumpApiCount(5); // 5 tokens × 1 call each
     try {
       const res = await fetch('/api/whales');
       if (res.ok) {
@@ -656,7 +656,7 @@ export default function Home() {
 
   const fetchLivefeed = useCallback(async () => {
     setLivefeedLoading(true);
-    bumpApiCount(3);
+    bumpApiCount(5); // 5 tokens × 1 call each
     try {
       const res = await fetch('/api/livefeed');
       if (res.ok) {
@@ -684,7 +684,6 @@ export default function Home() {
         )].slice(0, 10);
         if (uniqueAddresses.length > 0) {
           try {
-            bumpApiCount(1);
             const priceRes = await fetch(`/api/token-info?addresses=${uniqueAddresses.join(',')}`);
             if (priceRes.ok) {
               const priceJson = await priceRes.json();
